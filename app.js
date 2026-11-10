@@ -560,7 +560,7 @@
         ? `<button class="set-row" data-act="demo-clear"><span>Xoá dữ liệu mẫu<small>${n} mục mẫu (giao dịch và nợ), không ảnh hưởng dữ liệu thật</small></span></button>`
         : '<button class="set-row" data-act="demo-add"><span>Nạp dữ liệu mẫu<small>Thêm giao dịch và khoản nợ giả để xem giao diện và animation</small></span></button>'; })()}</section>
       <section class="card glass"><button class="set-row" data-act="toggle-motion"><span>Chuyển động<small>${reducedOS() && motionPref() === 'auto' ? 'Máy đang bật Giảm chuyển động nên hiệu ứng đang tắt. Bấm để ép bật' : 'Nền động, số đếm, biểu đồ vẽ dần. Tắt nếu máy giật'}</small></span><b>${motionOn() ? 'Bật' : 'Tắt'}</b></button></section>
-      <section class="card glass"><button class="set-row" data-act="lock-toggle"><span>Khóa app bằng mẫu chấm<small>${getLock() ? 'Vẽ mẫu 9 chấm khi mở app và khi quay lại sau 30 giây. Đây là khóa màn hình, không mã hóa dữ liệu' : 'Chưa bật. Vẽ mẫu nối chấm 3x3 để vào app'}</small></span><b>${getLock() ? 'Bật' : 'Tắt'}</b></button>${getLock() ? '<button class="set-row" data-act="lock-change"><span>Đổi mẫu mở khóa</span></button>' : ''}</section>
+      <section class="card glass"><button class="set-row" data-act="lock-toggle"><span>Khóa app bằng mẫu chấm<small>${getLock() ? 'Vẽ mẫu 9 chấm khi mở app và khi quay lại sau 30 giây. Đây là khóa màn hình, không mã hóa dữ liệu' : 'Chưa bật. Vẽ mẫu nối chấm 3x3 để vào app'}</small></span><b>${getLock() ? 'Bật' : 'Tắt'}</b></button>${getLock() ? `<button class="set-row" data-act="lock-change"><span>Đổi mẫu mở khóa</span></button><button class="set-row" data-act="face-toggle"><span>Mở khóa bằng Face ID<small>Tự hiện khi mở app, không được thì dùng mẫu chấm</small></span><b>${getFace() ? 'Bật' : 'Tắt'}</b></button>` : ''}</section>
       <section class="card glass"><button class="set-row danger" data-act="wipe"><span>Xoá toàn bộ dữ liệu</span></button></section>
       <section class="card glass"><div class="label">Cài lên màn hình chính. iOS: Safari &gt; Chia sẻ &gt; Thêm vào MH chính. Android: Chrome &gt; menu &gt; Cài đặt ứng dụng. Cài rồi thì iOS không tự dọn dữ liệu.</div></section>`;
   }
@@ -856,9 +856,11 @@
     add: () => (state.tab === 'debt' ? (state.debts.length ? openDSheet('pay') : openDSheet('debt')) : openSheet()),
     'debt-new': () => openDSheet('debt'),
     'lock-toggle': () => (getLock()
-      ? openLock('verify', { cancel: true, onOk: () => { try { localStorage.removeItem(LOCK_KEY); } catch { /* ignore */ } render(); toast('Đã tắt khóa'); } })
+      ? openLock('verify', { cancel: true, onOk: () => { try { localStorage.removeItem(LOCK_KEY); localStorage.removeItem(FACE_KEY); } catch { /* ignore */ } render(); toast('Đã tắt khóa'); } })
       : openLock('setup1', { cancel: true, onOk: () => { render(); toast('Đã bật khóa'); } })),
     'lock-change': () => openLock('verify', { cancel: true, onOk: () => openLock('setup1', { cancel: true, onOk: () => toast('Đã đổi mẫu') }) }),
+    'face-toggle': () => { if (getFace()) { try { localStorage.removeItem(FACE_KEY); } catch { /* ignore */ } render(); toast('Đã tắt Face ID'); } else faceEnroll(); },
+    'lock-face': tryFace,
     'lock-cancel': () => { lk.onOk = null; closeLock(); },
     'lock-forgot': forgotLock,
     dclose: closeDSheet,
@@ -1025,6 +1027,73 @@
   document.addEventListener('touchcancel', () => { if (swipe.drag) swipeCancel(); swipe.on = swipe.drag = false; }, { passive: true });
   $('#f-import').addEventListener('change', (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) importJSON(f); });
 
+  /* ---------- Face ID (WebAuthn, xác thực nền tảng) ---------- */
+  const FACE_KEY = 'dong-tien:faceid';
+  const getFace = () => { try { return JSON.parse(localStorage.getItem(FACE_KEY) || 'null'); } catch { return null; } };
+  const b64u = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const unb64u = (t) => { t = t.replace(/-/g, '+').replace(/_/g, '/'); t += '='.repeat((4 - (t.length % 4)) % 4); return Uint8Array.from(atob(t), (c) => c.charCodeAt(0)); };
+  const faceSupported = async () => {
+    try { return !!(window.PublicKeyCredential && PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable && (await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable())); } catch { return false; }
+  };
+  // chữ ký WebAuthn là DER, WebCrypto cần r||s dạng thô 64 byte
+  function derToRaw(der) {
+    let o = 2;
+    if (der[1] & 0x80) o = 2 + (der[1] & 0x7f);
+    const part = () => {
+      o++; const len = der[o++]; let v = der.slice(o, o + len); o += len;
+      while (v.length > 32 && v[0] === 0) v = v.slice(1);
+      const out = new Uint8Array(32); out.set(v, 32 - v.length); return out;
+    };
+    const r = part(), sg = part(), raw = new Uint8Array(64);
+    raw.set(r, 0); raw.set(sg, 32); return raw;
+  }
+  async function faceEnroll() {
+    if (!(await faceSupported())) return toast('Máy hoặc chế độ mở app này không hỗ trợ Face ID');
+    try {
+      const cred = await navigator.credentials.create({ publicKey: {
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        rp: { name: 'Dòng Tiền' },
+        user: { id: crypto.getRandomValues(new Uint8Array(16)), name: 'sty', displayName: 'STY' },
+        pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
+        authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'discouraged' },
+        attestation: 'none', timeout: 60000,
+      } });
+      const pub = cred && cred.response.getPublicKey && cred.response.getPublicKey();
+      if (!pub) throw new Error('no key');
+      localStorage.setItem(FACE_KEY, JSON.stringify({ id: b64u(cred.rawId), pub: b64u(pub) }));
+      render(); toast('Đã bật Face ID');
+    } catch { toast('Không bật được Face ID'); }
+  }
+  async function faceVerify() {
+    const cfg = getFace();
+    if (!cfg) return false;
+    const challenge = crypto.getRandomValues(new Uint8Array(32));
+    const cred = await navigator.credentials.get({ publicKey: {
+      challenge, userVerification: 'required', timeout: 60000,
+      allowCredentials: [{ type: 'public-key', id: unb64u(cfg.id), transports: ['internal'] }],
+    } });
+    if (!cred) return false;
+    const r = cred.response;
+    const cd = JSON.parse(new TextDecoder().decode(r.clientDataJSON));
+    if (cd.type !== 'webauthn.get' || cd.challenge !== b64u(challenge)) return false;
+    const ad = new Uint8Array(r.authenticatorData);
+    if (!(ad[32] & 0x04)) return false; // cờ UV: đã xác thực sinh trắc
+    const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', r.clientDataJSON));
+    const data = new Uint8Array(ad.length + 32); data.set(ad); data.set(hash, ad.length);
+    const key = await crypto.subtle.importKey('spki', unb64u(cfg.pub), { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
+    return crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key, derToRaw(new Uint8Array(r.signature)), data);
+  }
+  async function tryFace() {
+    if (!getFace() || !$('#lock').classList.contains('show') && !document.documentElement.classList.contains('locked')) return;
+    const tok = ++lk.faceTok;
+    $('#lk-msg').textContent = 'Đang xác thực Face ID';
+    let ok = false;
+    try { ok = await faceVerify(); } catch { ok = false; }
+    if (tok !== lk.faceTok || lk.mode !== 'verify') return;
+    if (ok) return lockSuccess();
+    if (Date.now() >= lk.until) $('#lk-msg').textContent = 'Face ID không được. Thử lại hoặc vẽ mẫu';
+  }
+
   /* ---------- khóa app bằng mẫu 9 chấm (khóa màn hình, không mã hóa dữ liệu) ---------- */
   const LOCK_KEY = 'dong-tien:lock', RELOCK_MS = 30000;
   const getLock = () => { try { return JSON.parse(localStorage.getItem(LOCK_KEY) || 'null'); } catch { return null; } };
@@ -1038,7 +1107,7 @@
     for (let i = 0; i < text.length; i++) { const c = text.charCodeAt(i); h1 = Math.imul(h1 ^ c, 2654435761); h2 = Math.imul(h2 ^ c, 1597334677); }
     return String(h1 >>> 0) + String(h2 >>> 0);
   }
-  const lk = { mode: 'verify', first: null, onOk: null, boot: false, seq: [], drawing: false, fails: 0, until: 0, tail: null, timer: null, hiddenAt: 0 };
+  const lk = { mode: 'verify', first: null, onOk: null, boot: false, seq: [], drawing: false, fails: 0, faceTok: 0, until: 0, tail: null, timer: null, hiddenAt: 0 };
   const NODE = (i) => ({ x: 50 + (i % 3) * 100, y: 50 + Math.floor(i / 3) * 100 });
 
   function buildLockGrid() {
@@ -1146,7 +1215,7 @@
     lk.fails = 0;
     setTimeout(() => { closeLock(); lk.seq = []; lockDraw(); if (f) f(); }, 220);
   }
-  function closeLock() { document.documentElement.classList.remove('locked'); $('#lock').classList.remove('show'); lk.drawing = false; }
+  function closeLock() { lk.faceTok++; document.documentElement.classList.remove('locked'); $('#lock').classList.remove('show'); lk.drawing = false; }
 
   // mode: verify | setup1. opts: { cancel, boot, onOk }
   function openLock(mode, opts = {}) {
@@ -1158,7 +1227,9 @@
     $('#lk-cancel').hidden = !opts.cancel;
     $('#lk-forgot').hidden = !(mode === 'verify' && opts.boot);
     $('#lock').classList.add('show');
-    if (Date.now() < lk.until) lockCountdown();
+    const face = mode === 'verify' && opts.boot && getFace();
+    $('#lk-face').hidden = !face;
+    if (Date.now() < lk.until) lockCountdown(); else if (face) tryFace();
   }
   function lockNow() {
     closeSheet(); closeDSheet();
@@ -1168,7 +1239,7 @@
   async function forgotLock() {
     if (!confirm('Quên mẫu sẽ XOÁ TOÀN BỘ dữ liệu trong app (giao dịch, nợ) và tắt khóa. Không khôi phục được nếu chưa backup JSON. Tiếp tục?')) return;
     await dbClear(); await dbClearS('debts'); await dbClearS('pays');
-    try { localStorage.removeItem(LOCK_KEY); } catch { /* ignore */ }
+    try { localStorage.removeItem(LOCK_KEY); localStorage.removeItem(FACE_KEY); } catch { /* ignore */ }
     state.txs = []; state.debts = []; state.pays = []; lk.onOk = null;
     closeLock(); shown.clear(); render(); toast('Đã xoá dữ liệu và tắt khóa');
   }
