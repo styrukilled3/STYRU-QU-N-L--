@@ -280,6 +280,7 @@ html, body { touch-action: pan-y; overflow-x: hidden; overflow-x: clip; overscro
 
 /* tip */
 .card h2:has(.tipseg) { align-items: center; }
+.cumbody { min-height: 170px; }
 .tipseg { display: inline-grid; grid-auto-flow: column; padding: 3px; border-radius: 8px; background: rgba(255, 255, 255, 0.07); }
 .tipseg button { height: 26px; padding: 0 12px; border-radius: 6px; font-size: 12px; color: var(--muted); font-weight: 500; transition: background 0.25s, color 0.25s; }
 .tipseg button.on { background: rgba(255, 255, 255, 0.16); color: var(--text); }

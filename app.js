@@ -263,6 +263,74 @@
       ${labels}</svg>`;
   }
 
+  // so sánh luỹ kế ròng của tháng đang chọn với 2 tháng trước, cùng trục ngày
+  const CUMVIEW_KEY = 'dong-tien:cumview';
+  const cumView = () => { try { return localStorage.getItem(CUMVIEW_KEY) === 'compare' ? 'compare' : 'cum'; } catch { return 'cum'; } };
+  function cumSeries(month, upTo) {
+    const [y, m] = month.split('-').map(Number);
+    const dim = new Date(y, m, 0).getDate();
+    const net = Array(dim).fill(0);
+    let has = false;
+    for (const t of state.txs) {
+      if (!t.date.startsWith(month)) continue;
+      has = true;
+      net[+t.date.slice(8, 10) - 1] += t.type === 'income' ? t.amount : -t.amount;
+    }
+    const len = upTo ? Math.min(dim, upTo) : dim;
+    const cum = []; let run = 0;
+    for (let i = 0; i < len; i++) { run += net[i]; cum.push(run); }
+    return { month, dim, cum, has };
+  }
+  function cumCompare() {
+    const { dim: curDim, elapsed } = monthInfo();
+    const cur0 = cumSeries(state.month, 0);
+    let lastTx = 0;
+    for (const t of state.txs) if (t.date.startsWith(state.month)) lastTx = Math.max(lastTx, +t.date.slice(8, 10));
+    const last = Math.max(elapsed, lastTx);
+    const A = { ...cumSeries(state.month, last), color: '#ff6129' };
+    const B = { ...cumSeries(shiftMonth(state.month, -1), 0), color: '#ffffff', op: 0.62 };
+    const C = { ...cumSeries(shiftMonth(state.month, -2), 0), color: '#ffffff', op: 0.26 };
+    if (!B.has && !C.has) return '<div class="empty-sm">Chưa có dữ liệu tháng trước để so sánh</div>';
+    if (!A.has) A.cum = [];
+    const dim = Math.max(curDim, B.dim, C.dim);
+    const all = [...A.cum, ...B.cum, ...C.cum];
+    const W = 340, H = 170, pl = 6, pr = 6, top = 26, bot = 24;
+    const lo = Math.min(0, ...all), hi = Math.max(0, ...all), span = hi - lo || 1;
+    const X = (i) => pl + i * ((W - pl - pr) / (dim - 1));
+    const Y = (v) => top + ((hi - v) / span) * (H - top - bot);
+    const path = (cum) => 'M' + cum.map((v, i) => X(i).toFixed(1) + ' ' + Y(v).toFixed(1)).join(' L');
+    const tl = (m) => 'T' + +m.slice(5);
+    // tháng trước lấy giá trị cùng ngày với tháng đang xem để so công bằng
+    const endV = (x) => { if (!x.cum.length) return null; const n = x === A || !A.cum.length ? x.cum.length : Math.min(A.cum.length, x.cum.length); return x.cum[n - 1]; };
+    const fmt = (v) => (v === null ? '-' : (v < 0 ? '-' : '') + compact(Math.abs(v)));
+    const lines = [C, B].map((x) => (x.cum.length ? `<path class="ln" pathLength="1" d="${path(x.cum)}" fill="none" stroke="${x.color}" stroke-opacity="${x.op}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>` : '')).join('');
+    let cur = '';
+    if (A.cum.length) {
+      const pts = A.cum.map((v, i) => [X(i), Y(v)]);
+      const [mx, my] = pts[pts.length - 1];
+      const base = H - bot;
+      const area = `${path(A.cum)} L${mx.toFixed(1)} ${base} L${pts[0][0].toFixed(1)} ${base} Z`;
+      cur = `<path class="ar" d="${area}" fill="url(#cmpFill)"/>
+        <path class="ln" pathLength="1" d="${path(A.cum)}" fill="none" stroke="#ff6129" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        <circle class="pulse" cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="10" fill="#ff6129" fill-opacity=".35"/>
+        <circle class="mk" cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="3.6" fill="#fff"/>`;
+    }
+    const marks = [...new Set([1, 8, 15, 22, dim])].filter((d) => d === dim || dim - d >= 3);
+    const labels = marks.map((d) => `<text x="${X(d - 1).toFixed(1)}" y="${H - 6}" text-anchor="middle">${d}</text>`).join('');
+    const leg = [A, B, C].map((x, i) => `<g transform="translate(${i * 114 + 2} 0)"><circle cx="4" cy="8" r="3.4" fill="${x.color}" fill-opacity="${x.op || 1}"/><text x="13" y="11" style="fill:var(--text)">${tl(x.month)}</text><text x="40" y="11">${fmt(endV(x))}</text></g>`).join('');
+    return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="So sánh dòng tiền luỹ kế giữa các tháng">
+      <defs><linearGradient id="cmpFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff6129" stop-opacity=".3"/><stop offset="1" stop-color="#ff6129" stop-opacity="0"/></linearGradient></defs>
+      ${leg}
+      <line class="axis" x1="0" x2="${W}" y1="${Y(0).toFixed(1)}" y2="${Y(0).toFixed(1)}" stroke-dasharray="3 4"/>
+      ${lines}${cur}${labels}</svg>`;
+  }
+  function cumCard() {
+    const v = cumView();
+    return `<section class="card glass" data-cumcard><h2><span>Luỹ kế trong tháng</span>
+      <span class="tipseg"><button data-cumview="cum" class="${v === 'cum' ? 'on' : ''}">Tháng này</button><button data-cumview="compare" class="${v === 'compare' ? 'on' : ''}">So sánh</button></span></h2>
+      <div class="cumbody">${v === 'cum' ? lineChart(monthTxs()) : cumCompare()}</div></section>`;
+  }
+
   // cột mảnh: thu (trắng) hướng lên, chi (cam) hướng xuống
   function flowChart(list) {
     const { dim: n } = monthInfo();
@@ -332,7 +400,7 @@
         <div class="tile glass out"><div class="label">Chi</div><i class="tick"></i><div class="bigrow">${tOut.svg}<span class="unit">${tOut.unit}</span></div><div class="sub">${nOut} khoản</div></div>
       </div>
       ${backupNotice()}
-      <section class="card glass"><h2><span>Luỹ kế trong tháng</span></h2>${lineChart(list)}</section>
+      ${cumCard()}
       <div class="tiles">
         <div class="tile glass"><div class="label">Chi TB mỗi ngày</div><i class="tick"></i><div class="bigrow">${avg.svg}<span class="unit">${avg.unit}</span></div><div class="sub">${elapsed} ngày tính</div></div>
         <div class="tile glass"><div class="label">Tiết kiệm</div><i class="tick"></i><div class="bigrow">${rate === null ? dm('-', 4.4, false) : dm(rate + '%', 4.4, rate < 0, 'rate', rate, '%')}</div><div class="sub">${rate === null ? 'Chưa có thu' : 'trên tổng thu'}</div></div>
@@ -895,11 +963,17 @@
   };
 
   document.addEventListener('click', (e) => {
-    const el = e.target.closest('[data-tipview],[data-act],[data-tab],[data-id],[data-f],[data-type],[data-add],[data-mul],[data-cat],[data-dedit],[data-dpay],[data-pid],[data-dsel],[data-dadd],[data-dmul]');
+    const el = e.target.closest('[data-cumview],[data-tipview],[data-act],[data-tab],[data-id],[data-f],[data-type],[data-add],[data-mul],[data-cat],[data-dedit],[data-dpay],[data-pid],[data-dsel],[data-dadd],[data-dmul]');
     if (!el) return;
     const d = el.dataset;
     if (d.act) return ACTIONS[d.act] && ACTIONS[d.act]();
     if (d.tab) { state.tab = d.tab; render(); window.scrollTo(0, 0); return; }
+    if (d.cumview) {
+      try { localStorage.setItem(CUMVIEW_KEY, d.cumview); } catch { /* ignore */ }
+      const card = $('[data-cumcard]');
+      if (card) card.outerHTML = cumCard();
+      return;
+    }
     if (d.tipview) {
       try { localStorage.setItem(TIPVIEW_KEY, d.tipview); } catch { /* ignore */ }
       const card = $('[data-tipcard]');
