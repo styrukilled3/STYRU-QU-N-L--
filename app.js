@@ -1378,12 +1378,6 @@
     let h = '';
     const rnd = (a, b) => a + Math.random() * (b - a);
     const vw = Math.max(innerWidth, 360), vh = Math.max(innerHeight, 640);
-    // 40 chấm li ti lao về tâm rồi tan, tạo cảm giác bị hút vào
-    for (let i = 0; i < 40; i++) {
-      const a = rnd(0, 6.283), r = rnd(Math.min(vw, vh) * 0.45, Math.max(vw, vh) * 0.6);
-      const ea = rnd(0, 6.283), er = rnd(0, 50);
-      h += `<i class="in-sw" style="--x0:${(Math.cos(a) * r).toFixed(0)}px;--y0:${(Math.sin(a) * r).toFixed(0)}px;--xe:${(Math.cos(ea) * er).toFixed(0)}px;--ye:${(Math.sin(ea) * er).toFixed(0)}px;--s:${rnd(2.5, 5).toFixed(1)}px;--t:${rnd(0.9, 1.5).toFixed(2)}s;--d:${rnd(0, 0.55).toFixed(2)}s"></i>`;
-    }
     pat.forEach((row, y) => [...row].forEach((ch, x) => {
       const a = rnd(0, 6.283), r = rnd(Math.min(vw, vh) * 0.35, Math.max(vw, vh) * 0.5);
       const lit = ch === '1';
