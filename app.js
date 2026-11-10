@@ -59,19 +59,21 @@
   function openDB() {
     if (!dbp) {
       dbp = new Promise((res, rej) => {
-        const r = indexedDB.open('dong-tien', 1);
-        r.onupgradeneeded = () => r.result.createObjectStore('txs', { keyPath: 'id' });
-        r.onsuccess = () => res(r.result);
+        const r = indexedDB.open('dong-tien', 2);
+        r.onupgradeneeded = () => {
+          ['txs', 'debts', 'pays'].forEach((n) => { if (!r.result.objectStoreNames.contains(n)) r.result.createObjectStore(n, { keyPath: 'id' }); });
+        };
+        r.onsuccess = () => { r.result.onversionchange = () => r.result.close(); res(r.result); };
         r.onerror = () => rej(r.error);
       });
     }
     return dbp;
   }
-  async function run(mode, fn) {
+  async function run(mode, fn, store = 'txs') {
     const db = await openDB();
     return new Promise((res, rej) => {
-      const t = db.transaction('txs', mode);
-      const req = fn(t.objectStore('txs'));
+      const t = db.transaction(store, mode);
+      const req = fn(t.objectStore(store));
       t.oncomplete = () => res(req && 'result' in req ? req.result : undefined);
       t.onerror = t.onabort = () => rej(t.error);
     });
@@ -82,13 +84,20 @@
   const dbDelMany = (ids) => run('readwrite', (s) => { ids.forEach((id) => s.delete(id)); });
   const dbClear = () => run('readwrite', (s) => s.clear());
   const dbBulk = (arr) => run('readwrite', (s) => { arr.forEach((r) => s.put(r)); });
+  // store khác (debts, pays)
+  const dbAllS = (st) => run('readonly', (s) => s.getAll(), st);
+  const dbPutS = (st, r) => run('readwrite', (s) => s.put(r), st);
+  const dbDelS = (st, id) => run('readwrite', (s) => s.delete(id), st);
+  const dbDelManyS = (st, ids) => run('readwrite', (s) => { ids.forEach((id) => s.delete(id)); }, st);
+  const dbBulkS = (st, arr) => run('readwrite', (s) => { arr.forEach((r) => s.put(r)); }, st);
+  const dbClearS = (st) => run('readwrite', (s) => s.clear(), st);
 
   const LB_KEY = 'dong-tien:last-backup';
   const getLastBackup = () => { try { return Number(localStorage.getItem(LB_KEY)) || 0; } catch { return 0; } };
   const setLastBackup = () => { try { localStorage.setItem(LB_KEY, String(Date.now())); } catch { /* ignore */ } };
 
   /* ---------- state ---------- */
-  const state = { txs: [], month: monthOf(todayStr()), tab: 'home', filter: 'all', q: '' };
+  const state = { txs: [], debts: [], pays: [], month: monthOf(todayStr()), tab: 'home', filter: 'all', q: '' };
   const monthTxs = () => state.txs.filter((t) => t.date.startsWith(state.month));
   function sums(list) {
     let i = 0, e = 0;
@@ -331,6 +340,103 @@
       <section class="card glass"><h2><span>Chi theo danh mục</span></h2>${catBreakdown(list, s.e)}</section>`;
   }
 
+  /* ---------- nợ ---------- */
+  const livePays = () => { const ids = new Set(state.debts.map((d) => d.id)); return state.pays.filter((p) => ids.has(p.debtId)); };
+  function debtStats() {
+    const pays = livePays();
+    const per = state.debts.map((d) => {
+      const paid = pays.filter((p) => p.debtId === d.id).reduce((a, p) => a + p.amount, 0);
+      return { d, paid, rem: Math.max(0, d.total - paid), pct: d.total ? Math.min(100, Math.round((paid / d.total) * 100)) : 0 };
+    });
+    const total = per.reduce((a, x) => a + x.d.total, 0);
+    const remaining = per.reduce((a, x) => a + x.rem, 0);
+    const monthPaid = pays.filter((p) => p.date.startsWith(state.month)).reduce((a, p) => a + p.amount, 0);
+    return { per, total, remaining, monthPaid, pays, pct: total ? Math.round(((total - remaining) / total) * 100) : null };
+  }
+  const monthsEnding = (n) => Array.from({ length: n }, (_, i) => shiftMonth(state.month, i - (n - 1)));
+
+  // cột trả nợ theo tháng, tháng đang chọn màu cam
+  function debtBarChart(st) {
+    const ms = monthsEnding(6);
+    const vals = ms.map((m) => st.pays.filter((p) => p.date.startsWith(m)).reduce((a, p) => a + p.amount, 0));
+    const max = Math.max(...vals);
+    if (!max) return '<div class="empty-sm">Chưa trả khoản nào trong 6 tháng này</div>';
+    const W = 340, H = 170, top = 22, bot = 24, px = 6;
+    const step = (W - px * 2) / ms.length, bw = Math.min(34, step * 0.56);
+    let g = '';
+    ms.forEach((m, i) => {
+      const x = px + i * step + (step - bw) / 2, cx = x + bw / 2, sel = m === state.month;
+      const h = vals[i] ? Math.max(4, (vals[i] / max) * (H - top - bot)) : 0;
+      const y = H - bot - h;
+      if (h) g += `<rect class="bar up" style="--d:${i * 70 + 80}ms" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="${Math.min(8, bw / 2).toFixed(1)}" fill="${sel ? 'var(--orange)' : 'var(--in)'}" fill-opacity="${sel ? 1 : 0.55}"/>`
+        + `<text class="val mkt" x="${cx.toFixed(1)}" y="${(y - 6).toFixed(1)}" text-anchor="middle">${compact(vals[i])}</text>`;
+      g += `<text x="${cx.toFixed(1)}" y="${H - 6}" text-anchor="middle"${sel ? ' style="fill:var(--orange)"' : ''}>T${+m.slice(5)}</text>`;
+    });
+    return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Số nợ đã trả theo tháng"><line class="axis" x1="0" x2="${W}" y1="${H - bot}" y2="${H - bot}"/>${g}</svg>`;
+  }
+
+  // dư nợ cuối mỗi tháng = tổng nợ hiện tại trừ số đã trả tới hết tháng đó
+  function debtLineChart(st) {
+    const ms = monthsEnding(6);
+    const rem = ms.map((m) => Math.max(0, st.total - st.pays.filter((p) => monthOf(p.date) <= m).reduce((a, p) => a + p.amount, 0)));
+    const W = 340, H = 150, pl = 14, pr = 14, top = 24, bot = 24, hi = Math.max(...rem, 1);
+    const X = (i) => pl + i * ((W - pl - pr) / (ms.length - 1));
+    const Y = (v) => top + ((hi - v) / hi) * (H - top - bot);
+    const pts = rem.map((v, i) => [X(i), Y(v)]);
+    const line = 'M' + pts.map((p) => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' L');
+    const base = H - bot;
+    const area = `${line} L${pts[pts.length - 1][0].toFixed(1)} ${base} L${pts[0][0].toFixed(1)} ${base} Z`;
+    const [mx, my] = pts[pts.length - 1];
+    const labels = ms.map((m, i) => `<text x="${X(i).toFixed(1)}" y="${H - 6}" text-anchor="middle"${m === state.month ? ' style="fill:var(--orange)"' : ''}>T${+m.slice(5)}</text>`).join('');
+    return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Dư nợ còn lại theo tháng">
+      <defs><linearGradient id="debtFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff6129" stop-opacity=".38"/><stop offset="1" stop-color="#ff6129" stop-opacity="0"/></linearGradient></defs>
+      <line class="axis" x1="0" x2="${W}" y1="${base}" y2="${base}" stroke-dasharray="3 4"/>
+      <path class="ar" d="${area}" fill="url(#debtFill)"/>
+      <path class="ln" pathLength="1" d="${line}" fill="none" stroke="#ff6129" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle class="pulse" cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="10" fill="#ff6129" fill-opacity=".35"/>
+      <circle class="mk" cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="3.6" fill="#fff"/>
+      <text class="val mkt" x="${Math.min(W - 22, Math.max(22, mx)).toFixed(1)}" y="${Math.max(11, my - 14).toFixed(1)}" text-anchor="middle">${compact(rem[rem.length - 1])}</text>
+      ${labels}</svg>`;
+  }
+
+  function viewDebt() {
+    const st = debtStats();
+    const mT = dmK(st.monthPaid, 4.4, 'dmonth');
+    const clean = state.debts.length > 0 && st.remaining === 0;
+    const open = st.per.filter((x) => x.rem > 0).length;
+    const tag = !state.debts.length ? 'Chưa có khoản nợ' : clean ? 'Sạch nợ' : `${open} khoản đang nợ`;
+    const cards = [...st.per].sort((a, b) => (a.rem === 0) - (b.rem === 0) || b.rem - a.rem).map((x, k) => `
+      <section class="card glass dcard">
+        <button class="dtop" data-dedit="${esc(x.d.id)}"><span class="dn">${esc(x.d.name)}</span><span class="dr num">${x.rem ? money(x.rem) : 'Đã tất toán'}</span></button>
+        <div class="dprog"><i style="width:${x.pct}%;--d:${k * 80}ms"></i></div>
+        <div class="dmeta"><span class="num">Đã trả ${money(x.paid)} / ${money(x.d.total)}</span><span class="num">${x.pct}%</span></div>
+        ${x.rem ? `<button class="btn ghost dpay" data-dpay="${esc(x.d.id)}">Trả nợ</button>` : ''}
+      </section>`).join('');
+    const names = new Map(state.debts.map((d) => [d.id, d.name]));
+    const mp = st.pays.filter((p) => p.date.startsWith(state.month)).sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
+    const hist = mp.length
+      ? `<div class="items glass">${mp.map((p) => `<button class="item" data-pid="${esc(p.id)}"><span class="dot" style="background:var(--orange)"></span><span class="mid"><span class="t">${esc(names.get(p.debtId))}</span><span class="s">${dateLabel(p.date)}${p.note ? ' · ' + esc(p.note) : ''}</span></span><span class="a num in">${money(p.amount)}</span></button>`).join('')}</div>`
+      : '<div class="empty-sm">Chưa trả khoản nào trong tháng này</div>';
+    return `${header()}
+      <section class="hero">
+        <h1 class="thin">Nợ</h1>
+        <i class="tick"></i>
+        <div class="hero-meta"><span class="label">Còn phải trả</span><span class="tag"><i class="dot ${clean ? 'in' : 'out'}"></i>${tag}</span></div>
+        <div class="bigrow">${dm(nf.format(st.remaining), 8, false, 'dremain', st.remaining)}<span class="unit">₫</span></div>
+      </section>
+      <div class="tiles">
+        <div class="tile glass"><div class="label">Trả tháng này</div><i class="tick"></i><div class="bigrow">${mT.svg}<span class="unit">${mT.unit}</span></div><div class="sub">${mp.length} lần trả</div></div>
+        <div class="tile glass"><div class="label">Tiến độ</div><i class="tick"></i><div class="bigrow">${st.pct === null ? dm('-', 4.4, false) : dm(st.pct + '%', 4.4, false, 'dprog', st.pct, '%')}</div><div class="sub">${st.pct === null ? 'Chưa có nợ' : 'đã trả trên tổng nợ'}</div></div>
+      </div>
+      ${state.debts.length ? `<section class="card glass"><h2><span>Trả nợ theo tháng</span></h2>${debtBarChart(st)}</section>
+      <section class="card glass"><h2><span>Dư nợ còn lại</span><span class="legend">cuối mỗi tháng</span></h2>${debtLineChart(st)}</section>` : '<div class="empty">Chưa có khoản nợ nào.<br>Bấm nút + hoặc nút bên dưới để thêm.</div>'}
+      <div class="group-title">Các khoản nợ</div>
+      ${cards}
+      <button class="btn ghost dnew" data-act="debt-new">+ Khoản nợ mới</button>
+      <div class="group-title">Lịch sử trả ${monthLabel(state.month).toLowerCase()}</div>
+      ${hist}`;
+  }
+
   function viewList() {
     const f = (k, l) => `<button data-f="${k}" class="${state.filter === k ? 'on' : ''}">${l}</button>`;
     return `${header()}
@@ -379,6 +485,7 @@
       <h1 class="thin sm">Backup &amp; dữ liệu</h1><i class="tick"></i>
       <section class="card glass" style="margin-top:0">
         <div class="kv"><span>Số giao dịch</span><b class="num">${state.txs.length}</b></div>
+        <div class="kv"><span>Số khoản nợ</span><b class="num">${state.debts.length}</b></div>
         <div class="kv"><span>Backup gần nhất</span><b>${lbText}</b></div>
         <div class="kv"><span>Lưu trữ bền vững</span><b id="persist">...</b></div>
       </section>
@@ -387,9 +494,9 @@
         <button class="set-row" data-act="import"><span>Khôi phục từ JSON<small>Gộp vào dữ liệu hiện tại, trùng ID thì ghi đè</small></span></button>
         <button class="set-row" data-act="export-csv"><span>Xuất CSV<small>Mở bằng Excel hoặc Google Sheets</small></span></button>
       </section>
-      <section class="card glass">${(() => { const n = state.txs.filter((t) => t.demo).length; return n
-        ? `<button class="set-row" data-act="demo-clear"><span>Xoá dữ liệu mẫu<small>${n} giao dịch mẫu, không ảnh hưởng dữ liệu thật</small></span></button>`
-        : '<button class="set-row" data-act="demo-add"><span>Nạp dữ liệu mẫu<small>Thêm giao dịch giả của tháng này để xem giao diện và animation</small></span></button>'; })()}</section>
+      <section class="card glass">${(() => { const n = state.txs.filter((t) => t.demo).length + state.debts.filter((t) => t.demo).length; return n
+        ? `<button class="set-row" data-act="demo-clear"><span>Xoá dữ liệu mẫu<small>${n} mục mẫu (giao dịch và nợ), không ảnh hưởng dữ liệu thật</small></span></button>`
+        : '<button class="set-row" data-act="demo-add"><span>Nạp dữ liệu mẫu<small>Thêm giao dịch và khoản nợ giả để xem giao diện và animation</small></span></button>'; })()}</section>
       <section class="card glass"><button class="set-row" data-act="toggle-motion"><span>Chuyển động<small>${reducedOS() && motionPref() === 'auto' ? 'Máy đang bật Giảm chuyển động nên hiệu ứng đang tắt. Bấm để ép bật' : 'Nền động, số đếm, biểu đồ vẽ dần. Tắt nếu máy giật'}</small></span><b>${motionOn() ? 'Bật' : 'Tắt'}</b></button></section>
       <section class="card glass"><button class="set-row danger" data-act="wipe"><span>Xoá toàn bộ dữ liệu</span></button></section>
       <section class="card glass"><div class="label">Cài lên màn hình chính. iOS: Safari &gt; Chia sẻ &gt; Thêm vào MH chính. Android: Chrome &gt; menu &gt; Cài đặt ứng dụng. Cài rồi thì iOS không tự dọn dữ liệu.</div></section>`;
@@ -416,9 +523,9 @@
   }
 
   function paint() {
-    $('#app').innerHTML = state.tab === 'home' ? viewHome() : state.tab === 'list' ? viewList() : viewSettings();
+    $('#app').innerHTML = state.tab === 'home' ? viewHome() : state.tab === 'list' ? viewList() : state.tab === 'debt' ? viewDebt() : viewSettings();
     if (state.tab === 'list') renderListBody();
-    if (state.tab === 'home') runCounters();
+    if (state.tab === 'home' || state.tab === 'debt') runCounters();
     if (state.tab === 'settings') {
       const el = $('#persist');
       if (navigator.storage && navigator.storage.persisted) navigator.storage.persisted().then((p) => { if (el) el.textContent = p ? 'Có' : 'Chưa'; });
@@ -504,6 +611,93 @@
     toast('Đã xoá', 'Hoàn tác', async () => { await dbPut(t); state.txs.push(t); render(); });
   }
 
+  /* ---------- sheet nợ ---------- */
+  const dsheet = { mode: 'pay', editing: null, debtId: null };
+  const remainingOf = (id) => { const d = state.debts.find((x) => x.id === id); if (!d) return 0; return Math.max(0, d.total - livePays().filter((p) => p.debtId === id).reduce((a, p) => a + p.amount, 0)); };
+
+  function renderDChips() {
+    $('#d-debts').innerHTML = state.debts.map((d) =>
+      `<button type="button" class="cat ${d.id === dsheet.debtId ? 'on' : ''}" data-dsel="${esc(d.id)}"><span class="dot" style="background:var(--orange)"></span>${esc(d.name)}</button>`).join('');
+  }
+  function openDSheet(mode, rec, debtId) {
+    dsheet.mode = mode; dsheet.editing = rec || null;
+    const isPay = mode === 'pay';
+    $('#d-title').textContent = isPay ? (rec ? 'Sửa khoản trả' : 'Trả nợ') : (rec ? 'Sửa khoản nợ' : 'Khoản nợ mới');
+    $('#d-namewrap').style.display = isPay ? 'none' : 'block';
+    $('#d-debts').style.display = isPay ? 'flex' : 'none';
+    $('#d-row2').style.display = isPay ? 'grid' : 'none';
+    $('#d-amount').placeholder = '0';
+    $('#d-amount').setAttribute('aria-label', isPay ? 'Số tiền trả' : 'Tổng nợ');
+    $('#d-amountlbl').textContent = isPay ? 'Số tiền trả' : 'Tổng nợ ban đầu';
+    $('#d-amount').value = rec ? nf.format(isPay ? rec.amount : rec.total) : '';
+    $('#d-name').value = !isPay && rec ? rec.name : '';
+    $('#d-note').value = isPay && rec ? rec.note || '' : '';
+    $('#d-date').value = isPay && rec ? rec.date : todayStr();
+    $('#d-del').hidden = !rec;
+    $('#d-del').textContent = isPay ? 'Xoá khoản trả' : 'Xoá khoản nợ';
+    if (isPay) {
+      const open = state.debts.find((d) => remainingOf(d.id) > 0);
+      dsheet.debtId = rec ? rec.debtId : (debtId || (open || state.debts[0] || {}).id);
+      renderDChips();
+    }
+    const el = $('#dsheet');
+    el.classList.add('open'); el.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('lock');
+    if (!rec) setTimeout(() => (isPay ? $('#d-amount') : $('#d-name')).focus(), 60);
+  }
+  function closeDSheet() {
+    const el = $('#dsheet');
+    el.classList.remove('open'); el.setAttribute('aria-hidden', 'true');
+    if (!$('#sheet').classList.contains('open')) document.body.classList.remove('lock');
+    if (document.activeElement) document.activeElement.blur();
+  }
+  async function saveD() {
+    const amount = parseAmt($('#d-amount').value);
+    const old = dsheet.editing;
+    try {
+      if (dsheet.mode === 'debt') {
+        const name = $('#d-name').value.trim();
+        if (!name) { toast('Nhập tên khoản nợ'); $('#d-name').focus(); return; }
+        if (!amount) { toast('Nhập tổng nợ'); $('#d-amount').focus(); return; }
+        const rec = { id: old ? old.id : uid(), name: name.slice(0, 60), total: amount, createdAt: old ? old.createdAt : Date.now() };
+        await dbPutS('debts', rec);
+        const i = state.debts.findIndex((d) => d.id === rec.id);
+        if (i >= 0) state.debts[i] = rec; else state.debts.push(rec);
+      } else {
+        const date = $('#d-date').value;
+        if (!dsheet.debtId || !state.debts.some((d) => d.id === dsheet.debtId)) { toast('Chọn khoản nợ'); return; }
+        if (!amount) { toast('Nhập số tiền trả'); $('#d-amount').focus(); return; }
+        if (!date) { toast('Chọn ngày'); return; }
+        const rec = { id: old ? old.id : uid(), debtId: dsheet.debtId, amount, date, note: $('#d-note').value.trim().slice(0, 200), createdAt: old ? old.createdAt : Date.now() };
+        await dbPutS('pays', rec);
+        const i = state.pays.findIndex((p) => p.id === rec.id);
+        if (i >= 0) state.pays[i] = rec; else state.pays.push(rec);
+        state.month = monthOf(date);
+      }
+    } catch { toast('Không lưu được, kiểm tra bộ nhớ trình duyệt'); return; }
+    closeDSheet(); render(); toast(old ? 'Đã cập nhật' : 'Đã lưu');
+  }
+  async function removeD() {
+    const old = dsheet.editing;
+    if (!old) return;
+    if (dsheet.mode === 'pay') {
+      await dbDelS('pays', old.id);
+      state.pays = state.pays.filter((p) => p.id !== old.id);
+      closeDSheet(); render();
+      toast('Đã xoá', 'Hoàn tác', async () => { await dbPutS('pays', old); state.pays.push(old); render(); });
+    } else {
+      const gone = state.pays.filter((p) => p.debtId === old.id);
+      await dbDelS('debts', old.id); await dbDelManyS('pays', gone.map((p) => p.id));
+      state.debts = state.debts.filter((d) => d.id !== old.id);
+      state.pays = state.pays.filter((p) => p.debtId !== old.id);
+      closeDSheet(); render();
+      toast(`Đã xoá khoản nợ${gone.length ? ` và ${gone.length} lần trả` : ''}`, 'Hoàn tác', async () => {
+        await dbPutS('debts', old); await dbBulkS('pays', gone);
+        state.debts.push(old); state.pays.push(...gone); render();
+      });
+    }
+  }
+
   /* ---------- demo data (gắn cờ demo, xoá được) ---------- */
   function demoTxs() {
     const t = todayStr(), mo = monthOf(t), last = +t.slice(8, 10);
@@ -519,6 +713,20 @@
     const amts = [25, 35, 45, 60, 120, 250, 480, 1200, 3000].map((x) => x * 1000);
     for (let d = 1; d <= last; d++) for (let k = (rnd() * 4) | 0; k > 0; k--) { const c = pick(cats); mk('expense', pick(amts), c, pick(notes[c]), d); }
     return out;
+  }
+
+  function demoDebts() {
+    const t = todayStr(), cur = monthOf(t), last = +t.slice(8, 10);
+    const debts = [
+      { id: 'demo-d1', name: 'Thẻ tín dụng', total: 24000000, createdAt: 1, demo: true },
+      { id: 'demo-d2', name: 'Vay bạn Nam', total: 10000000, createdAt: 2, demo: true },
+    ];
+    const plan = [[-4, 'demo-d1', 3000000], [-3, 'demo-d1', 4000000], [-2, 'demo-d1', 3500000], [-2, 'demo-d2', 2000000], [-1, 'demo-d1', 4500000], [-1, 'demo-d2', 2000000], [0, 'demo-d1', 3000000]];
+    const pays = plan.filter(([off]) => off < 0 || last >= 2).map(([off, debtId, amount], i) => {
+      const m = shiftMonth(cur, off);
+      return { id: 'demo-p' + i, debtId, amount, date: `${m}-${pad(off === 0 ? Math.min(2, last) : 5 + (i % 3) * 7)}`, note: i % 2 ? 'Chuyển khoản' : '', createdAt: 100 + i, demo: true };
+    });
+    return { debts, pays };
   }
 
   /* ---------- export / import ---------- */
@@ -537,7 +745,7 @@
     return true;
   }
   async function exportJSON() {
-    const data = { app: 'dong-tien', version: 1, exportedAt: new Date().toISOString(), transactions: state.txs };
+    const data = { app: 'dong-tien', version: 2, exportedAt: new Date().toISOString(), transactions: state.txs, debts: state.debts, payments: state.pays };
     if (await saveFile(`dong-tien-${todayStr()}.json`, 'application/json', JSON.stringify(data, null, 2))) {
       setLastBackup(); render(); toast('Đã xuất backup');
     }
@@ -556,16 +764,22 @@
     note: String(t.note || '').slice(0, 200), date: t.date, createdAt: +t.createdAt || Date.now(),
     ...(t.demo ? { demo: true } : {}),
   });
+  const validDebt = (d) => d && typeof d.id === 'string' && typeof d.name === 'string' && Number.isFinite(+d.total) && +d.total > 0;
+  const validPay = (p) => p && typeof p.id === 'string' && typeof p.debtId === 'string' && Number.isFinite(+p.amount) && +p.amount > 0 && /^\d{4}-\d{2}-\d{2}$/.test(p.date);
   async function importJSON(file) {
     try {
       const data = JSON.parse(await file.text());
       const arr = Array.isArray(data) ? data : data.transactions;
       const ok = (arr || []).filter(validTx).map(normTx);
-      if (!ok.length) throw new Error('empty');
-      await dbBulk(ok);
-      state.txs = await dbAll();
+      const dOk = (data.debts || []).filter(validDebt).map((d) => ({ id: d.id, name: d.name.slice(0, 60), total: Math.round(+d.total), createdAt: +d.createdAt || Date.now(), ...(d.demo ? { demo: true } : {}) }));
+      const pOk = (data.payments || []).filter(validPay).map((p) => ({ id: p.id, debtId: p.debtId, amount: Math.round(+p.amount), date: p.date, note: String(p.note || '').slice(0, 200), createdAt: +p.createdAt || Date.now(), ...(p.demo ? { demo: true } : {}) }));
+      if (!ok.length && !dOk.length && !pOk.length) throw new Error('empty');
+      if (ok.length) await dbBulk(ok);
+      if (dOk.length) await dbBulkS('debts', dOk);
+      if (pOk.length) await dbBulkS('pays', pOk);
+      state.txs = await dbAll(); state.debts = await dbAllS('debts'); state.pays = await dbAllS('pays');
       render();
-      toast(`Đã nhập ${ok.length} giao dịch`);
+      toast(`Đã nhập ${ok.length} giao dịch${dOk.length ? `, ${dOk.length} khoản nợ, ${pOk.length} lần trả` : ''}`);
     } catch { toast('File không hợp lệ'); }
   }
 
@@ -573,14 +787,22 @@
   const ACTIONS = {
     prev: () => { state.month = shiftMonth(state.month, -1); render(); },
     next: () => { state.month = shiftMonth(state.month, 1); render(); },
-    add: () => openSheet(),
+    add: () => (state.tab === 'debt' ? (state.debts.length ? openDSheet('pay') : openDSheet('debt')) : openSheet()),
+    'debt-new': () => openDSheet('debt'),
+    dclose: closeDSheet,
+    dsave: saveD,
+    ddel: removeD,
     'toggle-data': () => { state.tab = state.tab === 'settings' ? 'home' : 'settings'; render(); window.scrollTo(0, 0); },
     'demo-add': async () => {
-      await dbBulk(demoTxs()); state.txs = await dbAll(); state.month = monthOf(todayStr()); state.tab = 'home';
+      const dd = demoDebts();
+      await dbBulk(demoTxs()); await dbBulkS('debts', dd.debts); await dbBulkS('pays', dd.pays);
+      state.txs = await dbAll(); state.debts = await dbAllS('debts'); state.pays = await dbAllS('pays'); state.month = monthOf(todayStr()); state.tab = 'home';
       render(); window.scrollTo(0, 0); toast('Đã nạp dữ liệu mẫu');
     },
     'demo-clear': async () => {
-      await dbDelMany(state.txs.filter((t) => t.demo).map((t) => t.id)); state.txs = await dbAll();
+      await dbDelMany(state.txs.filter((t) => t.demo).map((t) => t.id));
+      await dbDelManyS('debts', state.debts.filter((t) => t.demo).map((t) => t.id)); await dbDelManyS('pays', state.pays.filter((t) => t.demo).map((t) => t.id));
+      state.txs = await dbAll(); state.debts = await dbAllS('debts'); state.pays = await dbAllS('pays');
       render(); toast('Đã xoá dữ liệu mẫu');
     },
     'toggle-motion': () => { try { localStorage.setItem(MOTION_KEY, motionOn() ? 'off' : 'on'); } catch { /* ignore */ } applyMotion(); render(); },
@@ -593,17 +815,27 @@
     'export-csv': exportCSV,
     import: () => $('#f-import').click(),
     wipe: async () => {
-      if (!confirm('Xoá toàn bộ giao dịch? Không khôi phục được nếu chưa backup.')) return;
-      await dbClear(); state.txs = []; render(); toast('Đã xoá hết');
+      if (!confirm('Xoá toàn bộ giao dịch và khoản nợ? Không khôi phục được nếu chưa backup.')) return;
+      await dbClear(); await dbClearS('debts'); await dbClearS('pays'); state.txs = []; state.debts = []; state.pays = []; render(); toast('Đã xoá hết');
     },
   };
 
   document.addEventListener('click', (e) => {
-    const el = e.target.closest('[data-act],[data-tab],[data-id],[data-f],[data-type],[data-add],[data-mul],[data-cat]');
+    const el = e.target.closest('[data-act],[data-tab],[data-id],[data-f],[data-type],[data-add],[data-mul],[data-cat],[data-dedit],[data-dpay],[data-pid],[data-dsel],[data-dadd],[data-dmul]');
     if (!el) return;
     const d = el.dataset;
     if (d.act) return ACTIONS[d.act] && ACTIONS[d.act]();
     if (d.tab) { state.tab = d.tab; render(); window.scrollTo(0, 0); return; }
+    if (d.dedit) { const x = state.debts.find((y) => y.id === d.dedit); if (x) openDSheet('debt', x); return; }
+    if (d.dpay) { openDSheet('pay', null, d.dpay); return; }
+    if (d.pid) { const x = state.pays.find((y) => y.id === d.pid); if (x) openDSheet('pay', x); return; }
+    if (d.dsel) { dsheet.debtId = d.dsel; renderDChips(); return; }
+    if (d.dadd || d.dmul) {
+      const cur = parseAmt($('#d-amount').value);
+      const next = d.dadd ? cur + Number(d.dadd) : cur * Number(d.dmul);
+      $('#d-amount').value = next ? nf.format(Math.min(next, 999999999999)) : '';
+      return;
+    }
     if (d.id) { const t = state.txs.find((x) => x.id === d.id); if (t) openSheet(t); return; }
     if (d.f) { state.filter = d.f; render(); return; }
     if (d.type) { sheet.type = d.type; syncType(); return; }
@@ -616,7 +848,7 @@
   });
 
   document.addEventListener('input', (e) => {
-    if (e.target.id === 'f-amount') {
+    if (e.target.id === 'f-amount' || e.target.id === 'd-amount') {
       const digits = e.target.value.replace(/\D/g, '').slice(0, 12);
       e.target.value = digits ? nf.format(Number(digits)) : '';
     } else if (e.target.id === 'q') {
@@ -624,7 +856,7 @@
       renderListBody();
     }
   });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheet(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSheet(); closeDSheet(); } });
   $('#f-import').addEventListener('change', (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) importJSON(f); });
 
   /* ---------- boot ---------- */
@@ -633,6 +865,7 @@
     home: ['...#...', '..###..', '.#####.', '#######', '.##.##.', '.##.##.', '.##.##.'],
     add:  ['.......', '...#...', '...#...', '.#####.', '...#...', '...#...', '.......'],
     list: ['.......', '.#####.', '.......', '.#####.', '.......', '.###...', '.......'],
+    debt: ['.......', '.#.....', '.#.....', '.#.#...', '.#.#...', '.#.#.#.', '#######'],
   };
   function dotIcon(rows) {
     let c = '';
@@ -643,7 +876,7 @@
     return `<svg class="dotic" viewBox="0 0 7 7" fill="currentColor" aria-hidden="true">${c}</svg>`;
   }
   function initDock() {
-    const map = { home: $('.dock [data-tab="home"]'), add: $('.dock [data-act="add"]'), list: $('.dock [data-tab="list"]') };
+    const map = { home: $('.dock [data-tab="home"]'), add: $('.dock [data-act="add"]'), list: $('.dock [data-tab="list"]'), debt: $('.dock [data-tab="debt"]') };
     Object.entries(map).forEach(([k, btn]) => { btn.innerHTML = dotIcon(DOCK_ICONS[k]); });
     $('.dock').addEventListener('pointerdown', (e) => {
       const b = e.target.closest('.dk'); if (!b) return;
@@ -655,7 +888,7 @@
   (async function boot() {
     applyMotion();
     initDock();
-    try { state.txs = await dbAll(); } catch { toast('Không mở được bộ nhớ trình duyệt'); }
+    try { state.txs = await dbAll(); state.debts = await dbAllS('debts'); state.pays = await dbAllS('pays'); } catch { toast('Không mở được bộ nhớ trình duyệt'); }
     render();
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
     if ('serviceWorker' in navigator && location.protocol !== 'file:') {

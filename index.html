@@ -23,6 +23,7 @@
   <button class="dk" data-tab="home" aria-label="Tổng quan"><svg class="i" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg></button>
   <button class="dk plus" data-act="add" aria-label="Thêm giao dịch"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
   <button class="dk" data-tab="list" aria-label="Giao dịch"><svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg></button>
+  <button class="dk" data-tab="debt" aria-label="Nợ"></button>
 </nav>
 
 <div class="overlay" id="sheet" aria-hidden="true">
@@ -56,6 +57,38 @@
     </div>
     <button class="btn primary" data-act="save">Lưu</button>
     <button class="btn ghost" id="f-del" data-act="delete" hidden>Xoá giao dịch</button>
+  </div>
+</div>
+
+<div class="overlay" id="dsheet" aria-hidden="true">
+  <div class="bd" data-act="dclose"></div>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="d-title">
+    <div class="grab"></div>
+    <div class="sh-head">
+      <h3 id="d-title">Trả nợ</h3>
+      <button class="icon-btn" data-act="dclose" aria-label="Đóng"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div id="d-namewrap" style="display:none"><input id="d-name" class="field" placeholder="Tên khoản nợ (thẻ tín dụng, vay bạn A...)" maxlength="60" autocomplete="off" aria-label="Tên khoản nợ"></div>
+    <div class="cats" id="d-debts" style="margin-top:0"></div>
+    <div class="label" id="d-amountlbl" style="margin-top:6px">Số tiền trả</div>
+    <div class="amount-wrap" style="margin-top:6px">
+      <input id="d-amount" class="amount num expense" inputmode="numeric" autocomplete="off" placeholder="0" aria-label="Số tiền">
+      <span class="cur">₫</span>
+    </div>
+    <div class="quick" id="d-quick">
+      <button type="button" class="chip" data-dmul="1000">000</button>
+      <button type="button" class="chip" data-dadd="100000">+100k</button>
+      <button type="button" class="chip" data-dadd="500000">+500k</button>
+      <button type="button" class="chip" data-dadd="1000000">+1tr</button>
+      <button type="button" class="chip" data-dadd="5000000">+5tr</button>
+      <button type="button" class="chip" data-dadd="10000000">+10tr</button>
+    </div>
+    <div class="row2" id="d-row2" style="margin-top:14px">
+      <input id="d-note" class="field" placeholder="Ghi chú" autocomplete="off" aria-label="Ghi chú">
+      <input id="d-date" class="field" type="date" aria-label="Ngày" style="width:150px">
+    </div>
+    <button class="btn primary" data-act="dsave" style="margin-top:6px">Lưu</button>
+    <button class="btn ghost" id="d-del" data-act="ddel" hidden>Xoá</button>
   </div>
 </div>
 
