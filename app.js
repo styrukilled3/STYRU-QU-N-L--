@@ -338,8 +338,8 @@
         <div class="tile glass"><div class="label">Tiết kiệm</div><i class="tick"></i><div class="bigrow">${rate === null ? dm('-', 4.4, false) : dm(rate + '%', 4.4, rate < 0, 'rate', rate, '%')}</div><div class="sub">${rate === null ? 'Chưa có thu' : 'trên tổng thu'}</div></div>
       </div>
       <section class="card glass"><h2><span>Thu chi theo ngày</span><span class="legend"><span class="dot in"></span>Thu<span class="dot out"></span>Chi</span></h2>${flowChart(list)}</section>
-      <section class="card glass"><h2><span>Chi theo danh mục</span></h2>${catBreakdown(list, s.e)}</section>
-      ${tipCard()}`;
+      ${tipCard()}
+      <section class="card glass"><h2><span>Chi theo danh mục</span></h2>${catBreakdown(list, s.e)}</section>`;
   }
 
   /* ---------- nợ ---------- */
