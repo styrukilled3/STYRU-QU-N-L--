@@ -858,8 +858,8 @@
   });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSheet(); closeDSheet(); } });
 
-  /* ---------- vuốt ngang đổi tab: Tổng quan > Giao dịch > Nợ ---------- */
-  const TAB_ORDER = ['home', 'list', 'debt'];
+  /* ---------- vuốt ngang đổi tab: Tổng quan > Nợ > Giao dịch ---------- */
+  const TAB_ORDER = ['home', 'debt', 'list'];
   const EASE = 'cubic-bezier(0.22, 0.8, 0.3, 1)';
   const swipe = { on: false, drag: false, x0: 0, y0: 0, t0: 0, dx: 0, busy: false };
   const swipeNeighbor = (dir) => TAB_ORDER[TAB_ORDER.indexOf(state.tab) + dir];
