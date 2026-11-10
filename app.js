@@ -384,7 +384,7 @@
         <div class="tile glass in"><div class="label">Thu</div><i class="tick"></i><div class="bigrow">${tIn.svg}<span class="unit">${tIn.unit}</span></div><div class="sub">${nIn} khoản</div></div>
         <div class="tile glass out"><div class="label">Chi</div><i class="tick"></i><div class="bigrow">${tOut.svg}<span class="unit">${tOut.unit}</span></div><div class="sub">${nOut} khoản</div></div>
       </div>
-      ${backupNotice()}
+      ${todayNotice()}${backupNotice()}
       ${cumCard()}
       <div class="tiles">
         <div class="tile glass"><div class="label">Chi TB mỗi ngày</div><i class="tick"></i><div class="bigrow">${avg.svg}<span class="unit">${avg.unit}</span></div><div class="sub">${elapsed} ngày tính</div></div>
@@ -612,6 +612,7 @@
       <section class="card glass">${(() => { const n = state.txs.filter((t) => t.demo).length + state.debts.filter((t) => t.demo).length; return n
         ? `<button class="set-row" data-act="demo-clear"><span>Xoá dữ liệu mẫu<small>${n} mục mẫu (giao dịch và nợ), không ảnh hưởng dữ liệu thật</small></span></button>`
         : '<button class="set-row" data-act="demo-add"><span>Nạp dữ liệu mẫu<small>Thêm giao dịch và khoản nợ giả để xem giao diện và animation</small></span></button>'; })()}</section>
+      <section class="card glass"><button class="set-row" data-act="remind-ics"><span>Nhắc nhập liệu 19:00<small>Thêm sự kiện lặp mỗi ngày có chuông vào Lịch iPhone. Chọn Lịch trong bảng chia sẻ</small></span></button></section>
       <section class="card glass"><button class="set-row" data-act="toggle-motion"><span>Chuyển động<small>${reducedOS() && motionPref() === 'auto' ? 'Máy đang bật Giảm chuyển động nên hiệu ứng đang tắt. Bấm để ép bật' : 'Nền động, số đếm, biểu đồ vẽ dần. Tắt nếu máy giật'}</small></span><b>${motionOn() ? 'Bật' : 'Tắt'}</b></button></section>
       <section class="card glass"><button class="set-row" data-act="lock-toggle"><span>Khóa app bằng mẫu chấm<small>${getLock() ? 'Chạm 5 chấm khi mở app và khi quay lại sau 30 giây. Đây là khóa màn hình, không mã hóa dữ liệu' : 'Chưa bật. Chạm 5 chấm trên lưới 3x3 để vào app'}</small></span><b>${getLock() ? 'Bật' : 'Tắt'}</b></button>${getLock() ? `<button class="set-row" data-act="lock-change"><span>Đổi mẫu mở khóa</span></button><button class="set-row" data-act="face-toggle"><span>Mở khóa bằng Face ID<small>Tự hiện khi mở app, không được thì dùng mẫu chấm</small></span><b>${getFace() ? 'Bật' : 'Tắt'}</b></button>` : ''}</section>
       <section class="card glass"><button class="set-row danger" data-act="wipe"><span>Xoá toàn bộ dữ liệu</span></button></section>
@@ -893,6 +894,29 @@
       setLastBackup(); render(); toast('Đã xuất backup');
     }
   }
+  // sự kiện lặp hằng ngày 19:00 (giờ địa phương) có chuông, thêm vào Lịch iPhone để nhắc nhập liệu
+  function reminderICS() {
+    const now = new Date(), d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + (now.getHours() >= 19 ? 1 : 0));
+    const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+    const stamp = now.toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+    const lines = [
+      'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Dong Tien//VI', 'CALSCALE:GREGORIAN',
+      'BEGIN:VEVENT', 'UID:dong-tien-daily-reminder@dong-tien', `DTSTAMP:${stamp}`,
+      `DTSTART:${ymd}T190000`, `DTEND:${ymd}T191500`, 'RRULE:FREQ=DAILY',
+      'SUMMARY:Ghi thu chi hôm nay', 'DESCRIPTION:Mở Dòng Tiền và nhập các khoản thu chi hôm nay.',
+      `URL:${new URL('./', location.href).href}`,
+      'BEGIN:VALARM', 'TRIGGER:PT0S', 'ACTION:DISPLAY', 'DESCRIPTION:Ghi thu chi hôm nay', 'END:VALARM',
+      'END:VEVENT', 'END:VCALENDAR',
+    ];
+    return lines.join('\r\n') + '\r\n';
+  }
+  // sau 19:00 mà hôm nay chưa ghi khoản nào thì nhắc ngay trong app
+  function todayNotice() {
+    if (state.month !== monthOf(todayStr()) || new Date().getHours() < 19) return '';
+    const t = todayStr();
+    if (state.txs.some((x) => x.date === t)) return '';
+    return '<div class="notice glass"><span>Hôm nay chưa ghi khoản nào.</span><button data-act="add">Thêm</button></div>';
+  }
   async function exportCSV() {
     const q = (s) => `"${String(s).replace(/"/g, '""')}"`;
     const rows = [...state.txs].sort((a, b) => a.date.localeCompare(b.date) || a.createdAt - b.createdAt)
@@ -964,6 +988,7 @@
     'goto-settings': () => { state.tab = 'settings'; render(); window.scrollTo(0, 0); },
     'export-json': exportJSON,
     'export-csv': exportCSV,
+    'remind-ics': async () => { if (await saveFile('nhac-nhap-lieu-19h.ics', 'text/calendar', reminderICS())) toast('Chọn Lịch để thêm nhắc 19:00'); },
     import: () => $('#f-import').click(),
     wipe: async () => {
       if (!confirm('Xoá toàn bộ giao dịch và khoản nợ? Không khôi phục được nếu chưa backup.')) return;
