@@ -156,7 +156,56 @@
   const motionPref = () => { try { return localStorage.getItem(MOTION_KEY) || 'auto'; } catch { return 'auto'; } };
   const reducedOS = () => !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
   const motionOn = () => { const p = motionPref(); return p === 'on' ? true : p === 'off' ? false : !reducedOS(); };
-  const applyMotion = () => { document.documentElement.dataset.motion = motionOn() ? 'on' : 'off'; };
+  const applyMotion = () => { document.documentElement.dataset.motion = motionOn() ? 'on' : 'off'; dotBg.sync(); };
+
+  // nền lưới chấm: sóng lan chậm từ một tâm trôi quanh màn hình. 30fps, dừng khi ẩn tab, tĩnh khi tắt chuyển động
+  const dotBg = (() => {
+    const cv = document.getElementById('dotbg');
+    if (!cv) return { sync() {} };
+    const ctx = cv.getContext('2d');
+    const GAP = 24;
+    let W = 0, H = 0, dpr = 1, raf = 0, last = 0;
+    function size() {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      W = innerWidth; H = innerHeight;
+      cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+      cv.style.width = W + 'px'; cv.style.height = H + 'px';
+      draw(performance.now());
+    }
+    function draw(t) {
+      const s = t / 1000;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      const cx = W * (0.5 + 0.32 * Math.sin(s * 0.11)), cy = H * (0.45 + 0.28 * Math.cos(s * 0.083));
+      const cols = Math.ceil(W / GAP) + 1, rows = Math.ceil(H / GAP) + 1;
+      const ox = (W - (cols - 1) * GAP) / 2, oy = (H - (rows - 1) * GAP) / 2;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const x = ox + c * GAP, y = oy + r * GAP;
+          const d = Math.hypot(x - cx, y - cy);
+          const w = 0.5 + 0.5 * Math.sin(d / 46 - s * 0.9);        // sóng lan ra từ tâm
+          const fall = Math.exp(-d / (Math.max(W, H) * 0.75));     // xa tâm thì mờ dần
+          const a = 0.05 + 0.2 * w * w * (0.35 + 0.65 * fall);
+          ctx.fillStyle = w > 0.82 ? `rgba(255,170,130,${a.toFixed(3)})` : `rgba(255,255,255,${a.toFixed(3)})`;
+          ctx.beginPath(); ctx.arc(x, y, 1.1 + 1.1 * w * w, 0, 6.2832); ctx.fill();
+        }
+      }
+    }
+    function loop(t) {
+      raf = requestAnimationFrame(loop);
+      if (t - last < 33) return;
+      last = t; draw(t);
+    }
+    function stop() { if (raf) cancelAnimationFrame(raf); raf = 0; }
+    function sync() {
+      stop();
+      if (!W) size();
+      if (motionOn() && !document.hidden) raf = requestAnimationFrame(loop); else draw(0);
+    }
+    addEventListener('resize', () => { size(); });
+    document.addEventListener('visibilitychange', sync);
+    return { sync };
+  })();
   const shown = new Map();
 
   function runCounters(root = document) {
