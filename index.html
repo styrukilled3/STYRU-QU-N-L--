@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<script>try{if(localStorage.getItem('dong-tien:lock'))document.documentElement.classList.add('locked')}catch(e){}</script>
+<script>try{var l=JSON.parse(localStorage.getItem('dong-tien:lock')||'null');if(l&&l.v===2)document.documentElement.classList.add('locked')}catch(e){}</script>
 <script>try{var r=document.documentElement,m=localStorage.getItem('dong-tien:motion'),rm=matchMedia('(prefers-reduced-motion: reduce)').matches;if((m==='on'||(m!=='off'&&!rm))&&!sessionStorage.getItem('dt-skip-intro')){r.classList.add('intro');setTimeout(function(){r.classList.remove('intro')},4500)}sessionStorage.removeItem('dt-skip-intro')}catch(e){}</script>
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="stylesheet" href="style.css">
@@ -99,8 +99,8 @@
   <div class="lk-in">
     <div class="lk-logo" id="lk-logo" aria-hidden="true"></div>
     <h1 class="lk-title" id="lk-title">Mở khóa</h1>
-    <p class="lk-msg" id="lk-msg" role="status" aria-live="polite">Vẽ mẫu để vào app</p>
-    <svg id="lk-grid" viewBox="0 0 300 300" role="img" aria-label="Lưới 9 chấm, kéo nối các chấm để nhập mẫu"></svg>
+    <p class="lk-msg" id="lk-msg" role="status" aria-live="polite">Chạm 5 chấm để vào app</p>
+    <svg id="lk-grid" viewBox="0 0 300 300" role="img" aria-label="Lưới 9 chấm, chạm lần lượt 5 chấm để nhập mẫu"></svg>
     <div class="lk-actions"><button id="lk-face" data-act="lock-face" hidden>Face ID</button><button id="lk-cancel" data-act="lock-cancel" hidden>Huỷ</button><button id="lk-forgot" data-act="lock-forgot" hidden>Quên mẫu?</button></div>
   </div>
 </div>

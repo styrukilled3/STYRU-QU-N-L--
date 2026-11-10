@@ -322,14 +322,12 @@ html.locked #stage, html.locked .dock { visibility: hidden; }
 .lk-title { margin: 22px 0 6px; font-weight: 200; font-size: 34px; letter-spacing: -0.04em; }
 .lk-msg { margin: 0 0 26px; color: var(--muted); font-size: 14px; min-height: 20px; }
 #lk-grid { width: min(78vw, 300px); height: auto; touch-action: none; user-select: none; -webkit-user-select: none; overflow: visible; }
-#lk-line { stroke: rgba(255, 255, 255, 0.85); filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.55)); }
 .lkd { fill: rgba(255, 255, 255, 0.34); transform-box: fill-box; transform-origin: center; transition: fill 0.2s; }
 .lkd.on { fill: #fff; transform: scale(1.35); filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.8)); animation: lkpop 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.2); }
 @keyframes lkpop { 0% { transform: scale(1); } 40% { transform: scale(1.9); } 100% { transform: scale(1.35); } }
 #lk-grid.err { animation: lkshake 0.45s ease-in-out; }
 #lk-grid.err .lkd.on { fill: var(--orange); filter: drop-shadow(0 0 6px rgba(255, 97, 41, 0.9)); }
-#lk-grid.err #lk-line { stroke: var(--orange); filter: drop-shadow(0 0 4px rgba(255, 97, 41, 0.7)); }
-@keyframes lkshake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-9px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(3px); } }
+#lk-grid.err @keyframes lkshake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-9px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(3px); } }
 .lk-actions { display: flex; gap: 12px; margin-top: 30px; min-height: 44px; }
 .lk-actions button { min-height: 44px; padding: 0 18px; color: var(--muted); font-size: 14px; }
 .lk-actions button:active { color: var(--text); }
