@@ -158,8 +158,8 @@
   const applyMotion = () => { document.documentElement.dataset.motion = motionOn() ? 'on' : 'off'; };
   const shown = new Map();
 
-  function runCounters() {
-    const els = $$('.dm[data-key]');
+  function runCounters(root = document) {
+    const els = $$('.dm[data-key]', root);
     if (!motionOn()) { els.forEach((el) => shown.set(el.dataset.key, +el.dataset.t)); return; }
     els.forEach((el) => {
       const key = el.dataset.key, to = +el.dataset.t, suf = el.dataset.suf || '';
@@ -447,8 +447,8 @@
       <div id="list-body"></div>`;
   }
 
-  function renderListBody() {
-    const body = $('#list-body');
+  function renderListBody(root = document) {
+    const body = $('#list-body', root);
     if (!body) return;
     let list = monthTxs();
     if (state.filter !== 'all') list = list.filter((t) => t.type === state.filter);
@@ -508,7 +508,7 @@
     const app = $('#app');
     const tabChanged = lastTab !== null && lastTab !== state.tab;
     lastTab = state.tab;
-    $$('.dock [data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === state.tab));
+    syncDock();
     clearTimeout(swapTimer);
     if (tabChanged && motionOn()) {
       app.classList.remove('enter'); app.classList.add('leave');
@@ -522,8 +522,11 @@
     paint();
   }
 
+  const viewFor = (tab) => (tab === 'home' ? viewHome() : tab === 'list' ? viewList() : tab === 'debt' ? viewDebt() : viewSettings());
+  const syncDock = () => $$('.dock [data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === state.tab));
+
   function paint() {
-    $('#app').innerHTML = state.tab === 'home' ? viewHome() : state.tab === 'list' ? viewList() : state.tab === 'debt' ? viewDebt() : viewSettings();
+    $('#app').innerHTML = viewFor(state.tab);
     if (state.tab === 'list') renderListBody();
     if (state.tab === 'home' || state.tab === 'debt') runCounters();
     if (state.tab === 'settings') {
@@ -858,31 +861,49 @@
   });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSheet(); closeDSheet(); } });
 
-  /* ---------- vuốt ngang đổi tab: Tổng quan > Nợ > Giao dịch ---------- */
+  /* ---------- vuốt ngang: 2 trang dính nhau trượt cùng ngón tay (Tổng quan > Nợ > Giao dịch) ---------- */
   const TAB_ORDER = ['home', 'debt', 'list'];
   const EASE = 'cubic-bezier(0.22, 0.8, 0.3, 1)';
-  const swipe = { on: false, drag: false, x0: 0, y0: 0, t0: 0, dx: 0, busy: false };
+  const swipe = { on: false, drag: false, x0: 0, y0: 0, t0: 0, dx: 0, busy: false, ghost: null, ghostDir: 0 };
   const swipeNeighbor = (dir) => TAB_ORDER[TAB_ORDER.indexOf(state.tab) + dir];
+  const viewW = () => document.documentElement.clientWidth;
   const clearAppStyle = () => { const a = $('#app'); a.style.transition = a.style.transform = a.style.opacity = ''; };
+  function killGhost() { if (swipe.ghost) swipe.ghost.remove(); swipe.ghost = null; swipe.ghostDir = 0; }
+
+  // trang kế được vẽ sẵn ngay khi bắt đầu kéo, nằm sát bên cạnh trang hiện tại
+  function makeGhost(dir) {
+    killGhost();
+    const tab = swipeNeighbor(dir), g = document.createElement('main');
+    g.className = 'pageghost'; g.innerHTML = viewFor(tab);
+    g.style.transform = `translateX(${dir * viewW()}px)`;
+    $('#app').before(g);
+    if (tab === 'list') renderListBody(g);
+    runCounters(g);
+    swipe.ghost = g; swipe.ghostDir = dir;
+  }
 
   function swipeCommit(dir) {
-    const app = $('#app'), next = swipeNeighbor(dir);
-    if (!motionOn()) { state.tab = next; render(); window.scrollTo(0, 0); return; }
+    const app = $('#app'), g = swipe.ghost, W = viewW(), next = swipeNeighbor(dir);
+    const dur = motionOn() ? 0.42 : 0.01, tr = `transform ${dur}s ${EASE}`;
     swipe.busy = true;
-    app.style.transition = 'transform 0.2s cubic-bezier(0.5, 0, 0.9, 0.6), opacity 0.2s ease-in';
-    app.style.transform = `translateX(${dir * -70}px)`; app.style.opacity = '0';
+    app.style.transition = g.style.transition = tr;
+    app.style.transform = `translateX(${-dir * W}px)`; g.style.transform = 'translateX(0)';
     setTimeout(() => {
-      state.tab = next; lastTab = next; render(); window.scrollTo(0, 0);
-      app.style.transition = 'none'; app.style.transform = `translateX(${dir * 56}px)`; app.style.opacity = '0';
-      void app.offsetWidth;
-      app.style.transition = `transform 0.55s ${EASE}, opacity 0.4s ease-out`; app.style.transform = ''; app.style.opacity = '';
-      setTimeout(() => { clearAppStyle(); swipe.busy = false; }, 580);
-    }, 200);
+      // ghost trở thành #app luôn, không vẽ lại nên không bị giật hay replay animation
+      state.tab = next; lastTab = next;
+      window.scrollTo(0, 0);
+      app.remove(); g.classList.remove('pageghost'); g.id = 'app'; g.removeAttribute('style');
+      swipe.ghost = null; swipe.ghostDir = 0; swipe.busy = false;
+      syncDock();
+    }, dur * 1000 + 30);
   }
   function swipeCancel() {
-    const app = $('#app');
-    app.style.transition = `transform 0.35s ${EASE}, opacity 0.35s ease-out`; app.style.transform = ''; app.style.opacity = '';
-    setTimeout(clearAppStyle, 380);
+    const app = $('#app'), g = swipe.ghost;
+    swipe.busy = true;
+    const tr = `transform 0.35s ${EASE}`;
+    app.style.transition = tr; app.style.transform = '';
+    if (g) { g.style.transition = tr; g.style.transform = `translateX(${swipe.ghostDir * viewW()}px)`; }
+    setTimeout(() => { clearAppStyle(); killGhost(); swipe.busy = false; }, 380);
   }
 
   document.addEventListener('touchstart', (e) => {
@@ -896,26 +917,33 @@
 
   document.addEventListener('touchmove', (e) => {
     if (!swipe.on) return;
-    const t = e.touches[0], dx = t.clientX - swipe.x0, dy = t.clientY - swipe.y0;
+    const t = e.touches[0], W = viewW();
+    const dx = Math.max(-W, Math.min(W, t.clientX - swipe.x0)), dy = t.clientY - swipe.y0;
     if (!swipe.drag) {
       if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) { swipe.on = false; return; }
       if (Math.abs(dx) < 10 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
       swipe.drag = true;
     }
     const dir = dx < 0 ? 1 : -1;
-    const shown = swipeNeighbor(dir) ? dx : dx * 0.22; // hết trang thì kéo nặng tay như dây thun
     swipe.dx = dx;
     const app = $('#app');
     app.style.transition = 'none';
-    app.style.transform = `translateX(${shown.toFixed(1)}px)`;
-    app.style.opacity = String(1 - Math.min(Math.abs(shown) / 380, 0.5));
+    if (swipeNeighbor(dir)) {
+      if (swipe.ghostDir !== dir) makeGhost(dir);
+      app.style.transform = `translateX(${dx.toFixed(1)}px)`;
+      swipe.ghost.style.transition = 'none';
+      swipe.ghost.style.transform = `translateX(${(dir * W + dx).toFixed(1)}px)`;
+    } else {
+      killGhost();
+      app.style.transform = `translateX(${(dx * 0.22).toFixed(1)}px)`; // hết trang thì kéo nặng tay như dây thun
+    }
   }, { passive: true });
 
   const swipeEnd = () => {
     if (!swipe.on || !swipe.drag) { swipe.on = false; return; }
     swipe.on = false; swipe.drag = false;
     const dx = swipe.dx, v = Math.abs(dx) / Math.max(1, performance.now() - swipe.t0), dir = dx < 0 ? 1 : -1;
-    if (swipeNeighbor(dir) && (Math.abs(dx) > 80 || (Math.abs(dx) > 30 && v > 0.5))) swipeCommit(dir);
+    if (swipe.ghost && swipe.ghostDir === dir && (Math.abs(dx) > 80 || (Math.abs(dx) > 30 && v > 0.5))) swipeCommit(dir);
     else swipeCancel();
   };
   document.addEventListener('touchend', swipeEnd, { passive: true });
