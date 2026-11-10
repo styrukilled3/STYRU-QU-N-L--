@@ -560,6 +560,7 @@
         ? `<button class="set-row" data-act="demo-clear"><span>Xoá dữ liệu mẫu<small>${n} mục mẫu (giao dịch và nợ), không ảnh hưởng dữ liệu thật</small></span></button>`
         : '<button class="set-row" data-act="demo-add"><span>Nạp dữ liệu mẫu<small>Thêm giao dịch và khoản nợ giả để xem giao diện và animation</small></span></button>'; })()}</section>
       <section class="card glass"><button class="set-row" data-act="toggle-motion"><span>Chuyển động<small>${reducedOS() && motionPref() === 'auto' ? 'Máy đang bật Giảm chuyển động nên hiệu ứng đang tắt. Bấm để ép bật' : 'Nền động, số đếm, biểu đồ vẽ dần. Tắt nếu máy giật'}</small></span><b>${motionOn() ? 'Bật' : 'Tắt'}</b></button></section>
+      <section class="card glass"><button class="set-row" data-act="lock-toggle"><span>Khóa app bằng mẫu chấm<small>${getLock() ? 'Vẽ mẫu 9 chấm khi mở app và khi quay lại sau 30 giây. Đây là khóa màn hình, không mã hóa dữ liệu' : 'Chưa bật. Vẽ mẫu nối chấm 3x3 để vào app'}</small></span><b>${getLock() ? 'Bật' : 'Tắt'}</b></button>${getLock() ? '<button class="set-row" data-act="lock-change"><span>Đổi mẫu mở khóa</span></button>' : ''}</section>
       <section class="card glass"><button class="set-row danger" data-act="wipe"><span>Xoá toàn bộ dữ liệu</span></button></section>
       <section class="card glass"><div class="label">Cài lên màn hình chính. iOS: Safari &gt; Chia sẻ &gt; Thêm vào MH chính. Android: Chrome &gt; menu &gt; Cài đặt ứng dụng. Cài rồi thì iOS không tự dọn dữ liệu.</div></section>`;
   }
@@ -854,6 +855,12 @@
     next: () => { state.month = shiftMonth(state.month, 1); render(); },
     add: () => (state.tab === 'debt' ? (state.debts.length ? openDSheet('pay') : openDSheet('debt')) : openSheet()),
     'debt-new': () => openDSheet('debt'),
+    'lock-toggle': () => (getLock()
+      ? openLock('verify', { cancel: true, onOk: () => { try { localStorage.removeItem(LOCK_KEY); } catch { /* ignore */ } render(); toast('Đã tắt khóa'); } })
+      : openLock('setup1', { cancel: true, onOk: () => { render(); toast('Đã bật khóa'); } })),
+    'lock-change': () => openLock('verify', { cancel: true, onOk: () => openLock('setup1', { cancel: true, onOk: () => toast('Đã đổi mẫu') }) }),
+    'lock-cancel': () => { lk.onOk = null; closeLock(); },
+    'lock-forgot': forgotLock,
     dclose: closeDSheet,
     dsave: saveD,
     ddel: removeD,
@@ -977,7 +984,7 @@
   document.addEventListener('touchstart', (e) => {
     swipe.on = false; swipe.drag = false;
     if (swipe.busy || e.touches.length !== 1 || !TAB_ORDER.includes(state.tab) || document.body.classList.contains('lock')) return;
-    if (e.target.closest('input, textarea, .overlay, .dock')) return;
+    if (e.target.closest('input, textarea, .overlay, .dock, #lock')) return;
     const t = e.touches[0];
     if (t.clientX < 16 || t.clientX > innerWidth - 16) return; // chừa mép màn hình cho cử chỉ của hệ điều hành
     Object.assign(swipe, { on: true, x0: t.clientX, y0: t.clientY, t0: performance.now(), dx: 0 });
@@ -1018,6 +1025,158 @@
   document.addEventListener('touchcancel', () => { if (swipe.drag) swipeCancel(); swipe.on = swipe.drag = false; }, { passive: true });
   $('#f-import').addEventListener('change', (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) importJSON(f); });
 
+  /* ---------- khóa app bằng mẫu 9 chấm (khóa màn hình, không mã hóa dữ liệu) ---------- */
+  const LOCK_KEY = 'dong-tien:lock', RELOCK_MS = 30000;
+  const getLock = () => { try { return JSON.parse(localStorage.getItem(LOCK_KEY) || 'null'); } catch { return null; } };
+  async function hashSeq(seq, salt) {
+    const text = salt + ':' + seq;
+    if (window.crypto && crypto.subtle) {
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+      return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+    }
+    let h1 = 0xdeadbeef, h2 = 0x41c6ce57; // dự phòng khi không có crypto.subtle
+    for (let i = 0; i < text.length; i++) { const c = text.charCodeAt(i); h1 = Math.imul(h1 ^ c, 2654435761); h2 = Math.imul(h2 ^ c, 1597334677); }
+    return String(h1 >>> 0) + String(h2 >>> 0);
+  }
+  const lk = { mode: 'verify', first: null, onOk: null, boot: false, seq: [], drawing: false, fails: 0, until: 0, tail: null, timer: null, hiddenAt: 0 };
+  const NODE = (i) => ({ x: 50 + (i % 3) * 100, y: 50 + Math.floor(i / 3) * 100 });
+
+  function buildLockGrid() {
+    const g = $('#lk-grid');
+    if (g.dataset.built) return;
+    g.dataset.built = '1';
+    let c = '<polyline id="lk-line" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>';
+    for (let i = 0; i < 9; i++) { const n = NODE(i); c += `<circle class="lkd" data-i="${i}" cx="${n.x}" cy="${n.y}" r="12"/>`; }
+    g.innerHTML = c;
+    const logo = ['111', '111', '100'];
+    $('#lk-logo').innerHTML = `<svg viewBox="0 0 30 30">${logo.map((row, y) => [...row].map((ch, x) => `<circle cx="${5 + x * 10}" cy="${5 + y * 10}" r="3.6" fill="#fff" fill-opacity="${ch === '1' ? 1 : 0.2}"/>`).join('')).join('')}</svg>`;
+    g.addEventListener('pointerdown', lockDown);
+    g.addEventListener('pointermove', lockMove);
+    g.addEventListener('pointerup', lockUp);
+    g.addEventListener('pointercancel', lockUp);
+  }
+  function lockPoint(e) {
+    const g = $('#lk-grid'), r = g.getBoundingClientRect();
+    return { x: ((e.clientX - r.left) / r.width) * 300, y: ((e.clientY - r.top) / r.height) * 300 };
+  }
+  // nối 2 chấm cách nhau 2 ô thì chấm giữa tự được tính, như pattern lock của Android
+  function lockAdd(i) {
+    if (lk.seq.includes(i)) return;
+    const prev = lk.seq[lk.seq.length - 1];
+    if (prev !== undefined) {
+      const a = NODE(prev), b = NODE(i);
+      if (Math.abs(a.x - b.x) % 200 === 0 && Math.abs(a.y - b.y) % 200 === 0) {
+        const mid = ((a.x + b.x) / 2 - 50) / 100 + (((a.y + b.y) / 2 - 50) / 100) * 3;
+        if (!lk.seq.includes(mid)) lk.seq.push(mid);
+      }
+    }
+    lk.seq.push(i);
+  }
+  function lockHit(p) {
+    for (let i = 0; i < 9; i++) { const n = NODE(i); if (Math.hypot(p.x - n.x, p.y - n.y) < 34) { lockAdd(i); return; } }
+  }
+  function lockDraw() {
+    const dots = $$('#lk-grid .lkd');
+    dots.forEach((d, i) => {
+      const on = lk.seq.includes(i);
+      if (on && !d.classList.contains('on')) { d.classList.remove('on'); void d.getBoundingClientRect(); }
+      d.classList.toggle('on', on);
+    });
+    const pts = lk.seq.map((i) => { const n = NODE(i); return `${n.x},${n.y}`; });
+    if (lk.tail && lk.drawing && lk.seq.length) pts.push(`${lk.tail.x.toFixed(1)},${lk.tail.y.toFixed(1)}`);
+    $('#lk-line').setAttribute('points', pts.join(' '));
+  }
+  function lockDown(e) {
+    if (Date.now() < lk.until) return;
+    e.preventDefault();
+    $('#lk-grid').setPointerCapture(e.pointerId);
+    $('#lk-grid').classList.remove('err');
+    lk.seq = []; lk.drawing = true; lk.tail = lockPoint(e);
+    lockHit(lk.tail); lockDraw();
+  }
+  function lockMove(e) {
+    if (!lk.drawing) return;
+    lk.tail = lockPoint(e); lockHit(lk.tail); lockDraw();
+  }
+  async function lockUp() {
+    if (!lk.drawing) return;
+    lk.drawing = false; lk.tail = null; lockDraw();
+    if (!lk.seq.length) return;
+    const seq = lk.seq.join('-');
+    if (lk.seq.length < 4) return lockFail('Nối ít nhất 4 chấm', false);
+    if (lk.mode === 'verify') {
+      const cfg = getLock();
+      if (cfg && (await hashSeq(seq, cfg.salt)) === cfg.hash) return lockSuccess();
+      lk.fails++;
+      if (lk.fails >= 5) { lk.fails = 0; lk.until = Date.now() + 30000; lockCountdown(); return lockFail('', true); }
+      return lockFail('Sai mẫu', true);
+    }
+    if (lk.mode === 'setup1') {
+      lk.first = seq; lk.mode = 'setup2';
+      lockText('Xác nhận mẫu', 'Vẽ lại mẫu vừa rồi');
+      lk.seq = []; lockDraw(); return;
+    }
+    if (seq === lk.first) {
+      const salt = uid();
+      try { localStorage.setItem(LOCK_KEY, JSON.stringify({ salt, hash: await hashSeq(seq, salt) })); } catch { toast('Không lưu được khóa'); return closeLock(); }
+      return lockSuccess();
+    }
+    lk.mode = 'setup1'; lk.first = null;
+    lockText('Mẫu mới', 'Không khớp. Vẽ lại từ đầu, tối thiểu 4 chấm');
+    lockFail('Không khớp. Vẽ lại từ đầu, tối thiểu 4 chấm', false);
+  }
+  function lockText(title, msg) { $('#lk-title').textContent = title; $('#lk-msg').textContent = msg; }
+  function lockFail(msg, shake) {
+    if (msg) $('#lk-msg').textContent = msg;
+    const g = $('#lk-grid');
+    g.classList.remove('err'); void g.getBoundingClientRect(); g.classList.add('err');
+    setTimeout(() => { if (!lk.drawing) { lk.seq = []; lockDraw(); g.classList.remove('err'); } }, 650);
+  }
+  function lockCountdown() {
+    clearInterval(lk.timer);
+    const tick = () => {
+      const left = Math.ceil((lk.until - Date.now()) / 1000);
+      if (left <= 0) { clearInterval(lk.timer); $('#lk-msg').textContent = 'Vẽ mẫu để vào app'; return; }
+      $('#lk-msg').textContent = `Sai nhiều lần. Thử lại sau ${left} giây`;
+    };
+    tick(); lk.timer = setInterval(tick, 500);
+  }
+  function lockSuccess() {
+    const f = lk.onOk; lk.onOk = null;
+    lk.fails = 0;
+    setTimeout(() => { closeLock(); lk.seq = []; lockDraw(); if (f) f(); }, 220);
+  }
+  function closeLock() { document.documentElement.classList.remove('locked'); $('#lock').classList.remove('show'); lk.drawing = false; }
+
+  // mode: verify | setup1. opts: { cancel, boot, onOk }
+  function openLock(mode, opts = {}) {
+    buildLockGrid();
+    lk.mode = mode; lk.first = null; lk.onOk = opts.onOk || null; lk.boot = !!opts.boot; lk.seq = []; lk.drawing = false;
+    lockDraw();
+    $('#lk-grid').classList.remove('err');
+    if (mode === 'verify') lockText('Mở khóa', 'Vẽ mẫu để vào app'); else lockText('Mẫu mới', 'Vẽ mẫu mở khóa, tối thiểu 4 chấm');
+    $('#lk-cancel').hidden = !opts.cancel;
+    $('#lk-forgot').hidden = !(mode === 'verify' && opts.boot);
+    $('#lock').classList.add('show');
+    if (Date.now() < lk.until) lockCountdown();
+  }
+  function lockNow() {
+    closeSheet(); closeDSheet();
+    document.documentElement.classList.add('locked');
+    openLock('verify', { boot: true, onOk: () => { shown.clear(); render(); } });
+  }
+  async function forgotLock() {
+    if (!confirm('Quên mẫu sẽ XOÁ TOÀN BỘ dữ liệu trong app (giao dịch, nợ) và tắt khóa. Không khôi phục được nếu chưa backup JSON. Tiếp tục?')) return;
+    await dbClear(); await dbClearS('debts'); await dbClearS('pays');
+    try { localStorage.removeItem(LOCK_KEY); } catch { /* ignore */ }
+    state.txs = []; state.debts = []; state.pays = []; lk.onOk = null;
+    closeLock(); shown.clear(); render(); toast('Đã xoá dữ liệu và tắt khóa');
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { lk.hiddenAt = Date.now(); return; }
+    if (getLock() && lk.hiddenAt && Date.now() - lk.hiddenAt > RELOCK_MS && !document.documentElement.classList.contains('locked')) lockNow();
+  });
+
   /* ---------- boot ---------- */
   // icon dock dạng dot-matrix 7x7: ô sáng = '#', ô tắt vẫn vẽ mờ để ra cảm giác lưới chấm
   const DOCK_ICONS = {
@@ -1047,6 +1206,7 @@
   (async function boot() {
     applyMotion();
     initDock();
+    if (getLock()) openLock('verify', { boot: true, onOk: () => { shown.clear(); render(); } });
     try { state.txs = await dbAll(); state.debts = await dbAllS('debts'); state.pays = await dbAllS('pays'); } catch { toast('Không mở được bộ nhớ trình duyệt'); }
     render();
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
