@@ -266,63 +266,28 @@
   // so sánh luỹ kế ròng của tháng đang chọn với 2 tháng trước, cùng trục ngày
   const CUMVIEW_KEY = 'dong-tien:cumview';
   const cumView = () => { try { return localStorage.getItem(CUMVIEW_KEY) === 'compare' ? 'compare' : 'cum'; } catch { return 'cum'; } };
-  function cumSeries(month, upTo) {
-    const [y, m] = month.split('-').map(Number);
-    const dim = new Date(y, m, 0).getDate();
-    const net = Array(dim).fill(0);
-    let has = false;
-    for (const t of state.txs) {
-      if (!t.date.startsWith(month)) continue;
-      has = true;
-      net[+t.date.slice(8, 10) - 1] += t.type === 'income' ? t.amount : -t.amount;
-    }
-    const len = upTo ? Math.min(dim, upTo) : dim;
-    const cum = []; let run = 0;
-    for (let i = 0; i < len; i++) { run += net[i]; cum.push(run); }
-    return { month, dim, cum, has };
-  }
+  // chênh lệch cả tháng so với tháng trước: ròng, thu, chi
   function cumCompare() {
-    const { dim: curDim, elapsed } = monthInfo();
-    const cur0 = cumSeries(state.month, 0);
-    let lastTx = 0;
-    for (const t of state.txs) if (t.date.startsWith(state.month)) lastTx = Math.max(lastTx, +t.date.slice(8, 10));
-    const last = Math.max(elapsed, lastTx);
-    const A = { ...cumSeries(state.month, last), color: '#ff6129' };
-    const B = { ...cumSeries(shiftMonth(state.month, -1), 0), color: '#ffffff', op: 0.62 };
-    const C = { ...cumSeries(shiftMonth(state.month, -2), 0), color: '#ffffff', op: 0.26 };
-    if (!B.has && !C.has) return '<div class="empty-sm">Chưa có dữ liệu tháng trước để so sánh</div>';
-    if (!A.has) A.cum = [];
-    const dim = Math.max(curDim, B.dim, C.dim);
-    const all = [...A.cum, ...B.cum, ...C.cum];
-    const W = 340, H = 170, pl = 6, pr = 6, top = 26, bot = 24;
-    const lo = Math.min(0, ...all), hi = Math.max(0, ...all), span = hi - lo || 1;
-    const X = (i) => pl + i * ((W - pl - pr) / (dim - 1));
-    const Y = (v) => top + ((hi - v) / span) * (H - top - bot);
-    const path = (cum) => 'M' + cum.map((v, i) => X(i).toFixed(1) + ' ' + Y(v).toFixed(1)).join(' L');
+    const pm = shiftMonth(state.month, -1);
+    const prev = state.txs.filter((t) => t.date.startsWith(pm));
+    if (!prev.length) return '<div class="empty-sm">Chưa có dữ liệu tháng trước để so sánh</div>';
+    const a = sums(monthTxs()), b = sums(prev);
     const tl = (m) => 'T' + +m.slice(5);
-    // tháng trước lấy giá trị cùng ngày với tháng đang xem để so công bằng
-    const endV = (x) => { if (!x.cum.length) return null; const n = x === A || !A.cum.length ? x.cum.length : Math.min(A.cum.length, x.cum.length); return x.cum[n - 1]; };
-    const fmt = (v) => (v === null ? '-' : (v < 0 ? '-' : '') + compact(Math.abs(v)));
-    const lines = [C, B].map((x) => (x.cum.length ? `<path class="ln" pathLength="1" d="${path(x.cum)}" fill="none" stroke="${x.color}" stroke-opacity="${x.op}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>` : '')).join('');
-    let cur = '';
-    if (A.cum.length) {
-      const pts = A.cum.map((v, i) => [X(i), Y(v)]);
-      const [mx, my] = pts[pts.length - 1];
-      const base = H - bot;
-      const area = `${path(A.cum)} L${mx.toFixed(1)} ${base} L${pts[0][0].toFixed(1)} ${base} Z`;
-      cur = `<path class="ar" d="${area}" fill="url(#cmpFill)"/>
-        <path class="ln" pathLength="1" d="${path(A.cum)}" fill="none" stroke="#ff6129" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-        <circle class="pulse" cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="10" fill="#ff6129" fill-opacity=".35"/>
-        <circle class="mk" cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="3.6" fill="#fff"/>`;
-    }
-    const marks = [...new Set([1, 8, 15, 22, dim])].filter((d) => d === dim || dim - d >= 3);
-    const labels = marks.map((d) => `<text x="${X(d - 1).toFixed(1)}" y="${H - 6}" text-anchor="middle">${d}</text>`).join('');
-    const leg = [A, B, C].map((x, i) => `<g transform="translate(${i * 114 + 2} 0)"><circle cx="4" cy="8" r="3.4" fill="${x.color}" fill-opacity="${x.op || 1}"/><text x="13" y="11" style="fill:var(--text)">${tl(x.month)}</text><text x="40" y="11">${fmt(endV(x))}</text></g>`).join('');
-    return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="So sánh dòng tiền luỹ kế giữa các tháng">
-      <defs><linearGradient id="cmpFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff6129" stop-opacity=".3"/><stop offset="1" stop-color="#ff6129" stop-opacity="0"/></linearGradient></defs>
-      ${leg}
-      <line class="axis" x1="0" x2="${W}" y1="${Y(0).toFixed(1)}" y2="${Y(0).toFixed(1)}" stroke-dasharray="3 4"/>
-      ${lines}${cur}${labels}</svg>`;
+    const sg = (v) => (v > 0 ? '+' : v < 0 ? '-' : '');
+    const cn = (v) => (v < 0 ? '-' : '') + compact(Math.abs(v));
+    const dNet = a.net - b.net;
+    const pct = (x, y) => (y > 0 ? ` (${sg(x - y)}${Math.abs(Math.round(((x - y) / y) * 100))}%)` : '');
+    // thu tăng là tốt, chi tăng là xấu (cam)
+    const row = (name, x, y, goodUp) => {
+      const d = x - y, bad = goodUp ? d < 0 : d > 0;
+      return `<div class="cmp-row"><span class="cmp-n">${name}</span><span class="cmp-v">${cn(x)}<i> / ${cn(y)}</i></span><span class="cmp-d${d === 0 ? '' : bad ? ' bad' : ' ok'}">${d === 0 ? '0' : sg(d) + compact(Math.abs(d))}${pct(x, y)}</span></div>`;
+    };
+    return `<div class="cmp">
+      <div class="cmp-hero"><span class="label">Ròng ${tl(state.month)} so với ${tl(pm)}</span>
+        <div class="cmp-big${dNet < 0 ? ' bad' : ''}">${dNet === 0 ? '0' : sg(dNet) + compact(Math.abs(dNet))}<small>₫</small></div>
+        <div class="cmp-sub">${tl(state.month)}: ${cn(a.net)} · ${tl(pm)}: ${cn(b.net)}</div></div>
+      ${row('Thu', a.i, b.i, true)}${row('Chi', a.e, b.e, false)}
+      <div class="cmp-note">Tính cả tháng. Số mờ là ${tl(pm)}</div></div>`;
   }
   function cumCard() {
     const v = cumView();

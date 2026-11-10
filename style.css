@@ -340,3 +340,17 @@ html.locked #stage, html.locked .dock { visibility: hidden; }
 /* scrim đen phủ lên blob để chữ dễ đọc, grain nằm trên cùng */
 .bg::before { content: ''; position: absolute; inset: 0; z-index: 1; background: linear-gradient(180deg, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.5) 100%); }
 .bg::after { z-index: 2; }
+
+/* tab so sánh tháng */
+.cmp { display: flex; flex-direction: column; min-height: 170px; }
+.cmp-hero { padding: 2px 0 12px; }
+.cmp-big { margin-top: 6px; font-size: 44px; font-weight: 200; letter-spacing: -0.05em; line-height: 1.05; }
+.cmp-big small { font-size: 16px; margin-left: 4px; letter-spacing: 0; color: var(--muted); }
+.cmp-big.bad { color: var(--orange); }
+.cmp-sub { margin-top: 4px; font-size: 13px; color: var(--muted); }
+.cmp-row { display: grid; grid-template-columns: 44px 1fr auto; align-items: baseline; gap: 8px; padding: 10px 0; border-top: 1px solid var(--stroke); font-size: 14px; }
+.cmp-n { color: var(--muted); }
+.cmp-v i { font-style: normal; color: var(--faint); }
+.cmp-d { font-weight: 500; }
+.cmp-d.bad { color: var(--orange); }
+.cmp-note { margin-top: auto; padding-top: 8px; font-size: 11px; color: var(--faint); }

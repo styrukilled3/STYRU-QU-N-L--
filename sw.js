@@ -1,4 +1,4 @@
-const V = 'dong-tien-v16';
+const V = 'dong-tien-v17';
 const ASSETS = ['./', 'index.html', 'style.css', 'app.js', 'manifest.json', 'icon.svg', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', (e) => {
