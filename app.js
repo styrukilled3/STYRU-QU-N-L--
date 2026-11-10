@@ -395,8 +395,27 @@
       <section class="card glass"><div class="label">Cài lên màn hình chính. iOS: Safari &gt; Chia sẻ &gt; Thêm vào MH chính. Android: Chrome &gt; menu &gt; Cài đặt ứng dụng. Cài rồi thì iOS không tự dọn dữ liệu.</div></section>`;
   }
 
+  // đổi tab: trang cũ mờ đi (ease-in) rồi trang mới trượt vào lần lượt (ease-in-out); đổi dữ liệu thì vẽ lại ngay
+  let lastTab = null, swapTimer;
   function render() {
+    const app = $('#app');
+    const tabChanged = lastTab !== null && lastTab !== state.tab;
+    lastTab = state.tab;
     $$('.dock [data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === state.tab));
+    clearTimeout(swapTimer);
+    if (tabChanged && motionOn()) {
+      app.classList.remove('enter'); app.classList.add('leave');
+      swapTimer = setTimeout(() => {
+        paint(); window.scrollTo(0, 0);
+        app.classList.remove('leave'); void app.offsetWidth; app.classList.add('enter');
+      }, 240);
+      return;
+    }
+    app.classList.remove('leave', 'enter');
+    paint();
+  }
+
+  function paint() {
     $('#app').innerHTML = state.tab === 'home' ? viewHome() : state.tab === 'list' ? viewList() : viewSettings();
     if (state.tab === 'list') renderListBody();
     if (state.tab === 'home') runCounters();
