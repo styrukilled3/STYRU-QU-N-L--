@@ -609,8 +609,33 @@
   $('#f-import').addEventListener('change', (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) importJSON(f); });
 
   /* ---------- boot ---------- */
+  // icon dock dạng dot-matrix 7x7: ô sáng = '#', ô tắt vẫn vẽ mờ để ra cảm giác lưới chấm
+  const DOCK_ICONS = {
+    home: ['...#...', '..###..', '.#####.', '#######', '.##.##.', '.##.##.', '.##.##.'],
+    add:  ['.......', '...#...', '...#...', '.#####.', '...#...', '...#...', '.......'],
+    list: ['.......', '.#####.', '.......', '.#####.', '.......', '.###...', '.......'],
+  };
+  function dotIcon(rows) {
+    let c = '';
+    rows.forEach((row, y) => [...row].forEach((ch, x) => {
+      const d = Math.hypot(x - 3, y - 3).toFixed(2);
+      c += `<circle class="${ch === '#' ? 'on' : 'off'}" cx="${x + 0.5}" cy="${y + 0.5}" r="0.36" style="--d:${d}"/>`;
+    }));
+    return `<svg class="dotic" viewBox="0 0 7 7" fill="currentColor" aria-hidden="true">${c}</svg>`;
+  }
+  function initDock() {
+    const map = { home: $('.dock [data-tab="home"]'), add: $('.dock [data-act="add"]'), list: $('.dock [data-tab="list"]') };
+    Object.entries(map).forEach(([k, btn]) => { btn.innerHTML = dotIcon(DOCK_ICONS[k]); });
+    $('.dock').addEventListener('pointerdown', (e) => {
+      const b = e.target.closest('.dk'); if (!b) return;
+      b.classList.remove('rip'); void b.offsetWidth; b.classList.add('rip');
+    });
+    $('.dock').addEventListener('animationend', (e) => { const b = e.target.closest('.dk'); if (b && e.target.tagName === 'circle') b.classList.remove('rip'); });
+  }
+
   (async function boot() {
     applyMotion();
+    initDock();
     try { state.txs = await dbAll(); } catch { toast('Không mở được bộ nhớ trình duyệt'); }
     render();
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
