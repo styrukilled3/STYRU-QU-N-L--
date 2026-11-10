@@ -266,6 +266,24 @@
   // so sánh luỹ kế ròng của tháng đang chọn với 2 tháng trước, cùng trục ngày
   const CUMVIEW_KEY = 'dong-tien:cumview';
   const cumView = () => { try { return localStorage.getItem(CUMVIEW_KEY) === 'compare' ? 'compare' : 'cum'; } catch { return 'cum'; } };
+  // đường mảnh Ròng 6 tháng, điểm cuối (tháng đang xem) màu cam phát sáng
+  function netSpark(vals) {
+    const W = 124, H = 54, p = 7;
+    const lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1;
+    const X = (i) => p + (i * (W - p * 2)) / (vals.length - 1);
+    const Y = (v) => p + ((hi - v) / span) * (H - p * 2);
+    const pts = vals.map((v, i) => [X(i), Y(v)]);
+    const line = 'M' + pts.map((q) => q[0].toFixed(1) + ' ' + q[1].toFixed(1)).join(' L');
+    const [mx, my] = pts[pts.length - 1];
+    const area = `${line} L${mx.toFixed(1)} ${H} L${pts[0][0].toFixed(1)} ${H} Z`;
+    return `<svg class="chart spark" viewBox="0 0 ${W} ${H}" role="img" aria-label="Xu hướng Ròng 6 tháng gần nhất">
+      <defs><linearGradient id="spkFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff6129" stop-opacity=".3"/><stop offset="1" stop-color="#ff6129" stop-opacity="0"/></linearGradient></defs>
+      <path class="ar" d="${area}" fill="url(#spkFill)"/>
+      <path class="ln" pathLength="1" d="${line}" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle class="pulse" cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="8" fill="#ff6129" fill-opacity=".35"/>
+      <circle class="mk" cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="3.4" fill="#ff6129"/></svg>`;
+  }
+
   // chênh lệch cả tháng so với tháng trước: ròng, thu, chi
   function cumCompare() {
     const pm = shiftMonth(state.month, -1);
@@ -276,6 +294,7 @@
     const sg = (v) => (v > 0 ? '+' : v < 0 ? '-' : '');
     const cn = (v) => (v < 0 ? '-' : '') + compact(Math.abs(v));
     const dNet = a.net - b.net;
+    const trend = monthsEnding(6).map((m) => sums(state.txs.filter((t) => t.date.startsWith(m))).net);
     const pct = (x, y) => (y > 0 ? ` (${sg(x - y)}${Math.abs(Math.round(((x - y) / y) * 100))}%)` : '');
     // thu tăng là tốt, chi tăng là xấu (cam)
     const row = (name, x, y, goodUp) => {
@@ -283,9 +302,10 @@
       return `<div class="cmp-row"><span class="cmp-n">${name}</span><span class="cmp-v">${cn(x)}<i> / ${cn(y)}</i></span><span class="cmp-d${d === 0 ? '' : bad ? ' bad' : ' ok'}">${d === 0 ? '0' : sg(d) + compact(Math.abs(d))}${pct(x, y)}</span></div>`;
     };
     return `<div class="cmp">
-      <div class="cmp-hero"><span class="label">Ròng ${tl(state.month)} so với ${tl(pm)}</span>
+      <div class="cmp-hero"><div><span class="label">Ròng ${tl(state.month)} so với ${tl(pm)}</span>
         <div class="cmp-big${dNet < 0 ? ' bad' : ''}">${dNet === 0 ? '0' : sg(dNet) + compact(Math.abs(dNet))}<small>₫</small></div>
         <div class="cmp-sub">${tl(state.month)}: ${cn(a.net)} · ${tl(pm)}: ${cn(b.net)}</div></div>
+        ${netSpark(trend)}</div>
       ${row('Thu', a.i, b.i, true)}${row('Chi', a.e, b.e, false)}
       <div class="cmp-note">Tính cả tháng. Số mờ là ${tl(pm)}</div></div>`;
   }

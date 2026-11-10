@@ -343,7 +343,8 @@ html.locked #stage, html.locked .dock { visibility: hidden; }
 
 /* tab so sánh tháng */
 .cmp { display: flex; flex-direction: column; min-height: 170px; }
-.cmp-hero { padding: 2px 0 12px; }
+.cmp-hero { padding: 2px 0 12px; display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; }
+.cmp-hero .spark { width: 112px; height: auto; flex: none; overflow: visible; margin-bottom: 6px; }
 .cmp-big { margin-top: 6px; font-size: 44px; font-weight: 200; letter-spacing: -0.05em; line-height: 1.05; }
 .cmp-big small { font-size: 16px; margin-left: 4px; letter-spacing: 0; color: var(--muted); }
 .cmp-big.bad { color: var(--orange); }
