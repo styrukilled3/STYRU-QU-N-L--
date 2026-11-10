@@ -1391,16 +1391,43 @@
     }));
     logo.innerHTML = h;
     let done = false;
-    const end = () => {
+    const lockSet = !!getLock();
+    if (lockSet) $('#lock').classList.add('hold'); // giấu lưới chấm của màn khóa tới lúc match cut
+    const finish = () => {
+      $('#lock').classList.remove('hold');
+      el.remove();
+      document.dispatchEvent(new Event('intro-done'));
+    };
+    const end = (skipped) => {
       if (done) return; done = true;
       clearTimeout(auto);
+      const grid = $('#lk-grid');
+      // match cut: 9 chấm của intro trượt và co giãn đúng vào 9 chấm của màn khóa rồi đổi chỗ không thấy khớp nối
+      if (skipped !== true && lockSet && grid && grid.dataset.built && el.animate) {
+        const box = grid.getBoundingClientRect(), sc = box.width / 300, lr = logo.getBoundingClientRect();
+        const anims = $$('.in-dot', el).map((d, k) => {
+          const x = k % 3, y = Math.floor(k / 3);
+          const cx = lr.left + 12 + x * 48, cy = lr.top + 12 + y * 48;
+          const tx = box.left + (50 + 100 * x) * sc, ty = box.top + (50 + 100 * y) * sc;
+          const cs = getComputedStyle(d);
+          return d.animate([
+            { transform: 'translate(0px, 0px) scale(1)', boxShadow: cs.boxShadow, opacity: +cs.opacity },
+            { transform: `translate(${(tx - cx).toFixed(1)}px, ${(ty - cy).toFixed(1)}px) scale(${sc.toFixed(3)})`, boxShadow: '0 0 0 0 rgba(255, 255, 255, 0)', opacity: 0.34 },
+          ], { duration: 720, delay: k * 22, easing: 'cubic-bezier(0.65, 0, 0.35, 1)', fill: 'forwards' }).finished;
+        });
+        const word = $('.in-word', el);
+        if (word) word.animate([{ opacity: +getComputedStyle(word).opacity }, { opacity: 0 }], { duration: 300, fill: 'forwards' });
+        el.classList.add('morph');
+        setTimeout(() => root.classList.remove('intro'), 250);
+        Promise.all(anims).catch(() => {}).then(() => { root.classList.remove('intro'); finish(); });
+        return;
+      }
       el.classList.add('out'); root.classList.remove('intro');
-      document.dispatchEvent(new Event('intro-done'));
       if (!root.classList.contains('locked')) replayEnter();
-      setTimeout(() => el.remove(), 700);
+      setTimeout(finish, 600);
     };
-    const auto = setTimeout(end, 2500);
-    el.addEventListener('pointerdown', end, { once: true });
+    const auto = setTimeout(end, 2400);
+    el.addEventListener('pointerdown', () => end(true), { once: true });
   }
 
   (async function boot() {

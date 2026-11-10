@@ -378,7 +378,7 @@ html[data-motion="off"] .tipseg::before { transition: none; }
 
 /* ---------- intro: chấm bay vào hình chữ P ---------- */
 #intro { position: fixed; inset: 0; z-index: 200; display: none; flex-direction: column; align-items: center; justify-content: center; touch-action: none; }
-html.intro #intro, #intro.out { display: flex; }
+html.intro #intro, #intro.out, #intro.morph { display: flex; }
 html.intro #stage, html.intro .dock { visibility: hidden; }
 #intro.out { pointer-events: none; animation: introout 0.55s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
 @keyframes introout { to { opacity: 0; transform: scale(1.06); } }
@@ -393,3 +393,7 @@ html.intro #stage, html.intro .dock { visibility: hidden; }
 @keyframes insw { from { transform: translate(var(--x0), var(--y0)); opacity: 0; } 25% { opacity: 0.8; } to { transform: translate(var(--xe), var(--ye)); opacity: 0; } }
 .in-word { margin-top: 38px; font-size: 30px; font-weight: 200; letter-spacing: -0.055em; color: var(--text); animation: inword 0.9s 1.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
 @keyframes inword { from { opacity: 0; letter-spacing: 0.22em; } }
+
+/* match cut: màn khóa ẩn trong lúc intro, lưới chấm chỉ hiện khi 9 chấm intro đã vào đúng chỗ */
+html.intro #lock { opacity: 0 !important; transition: none !important; }
+#lock.hold #lk-grid { opacity: 0; }
