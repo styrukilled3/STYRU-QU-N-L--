@@ -386,10 +386,38 @@
   const tipByMonth = (ms) => ms.map((m) => state.txs.filter((t) => t.type === 'income' && t.cat === 'tip' && t.date.startsWith(m)).reduce((a, t) => a + t.amount, 0));
   const tipMonthName = (m) => `Tháng ${+m.slice(5)}${m.slice(0, 4) !== state.month.slice(0, 4) ? ' ' + m.slice(0, 4) : ''}`;
 
+  // cột dạng ma trận chấm: mỗi tháng là một cột 4 chấm ngang, cao tối đa 15 chấm, chấm mọc lên từ đáy
+  function tipDotChart(ms, vals) {
+    const W = 340, H = 170, bot = 24, cell = 8, cols = 4, rows = 15, base = H - bot;
+    const max = Math.max(...vals), step = (W - 12) / ms.length;
+    let g = '';
+    ms.forEach((m, i) => {
+      const x0 = 6 + i * step + (step - cols * cell) / 2, sel = m === state.month;
+      const fill = vals[i] ? Math.max(1, Math.round((vals[i] / max) * rows)) : 0;
+      let dots = '';
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        const on = r < fill, cx = (x0 + (c + 0.5) * cell).toFixed(1), cy = (base - (r + 0.5) * cell).toFixed(1);
+        dots += `<circle class="tdot ${on ? (sel ? 'hot' : 'on') : 'off'}" cx="${cx}" cy="${cy}" r="2.5"${on ? ` style="--d:${r * 28 + i * 60 + 60}ms"` : ''}/>`;
+      }
+      const cx = x0 + (cols * cell) / 2;
+      g += dots;
+      if (fill) g += `<text class="val mkt" x="${cx.toFixed(1)}" y="${Math.max(11, base - fill * cell - 6).toFixed(1)}" text-anchor="middle">${compact(vals[i])}</text>`;
+      g += `<text x="${cx.toFixed(1)}" y="${H - 6}" text-anchor="middle"${sel ? ' style="fill:var(--orange)"' : ''}>T${+m.slice(5)}</text>`;
+    });
+    return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Tip theo tháng">${g}</svg>`;
+  }
+  // thanh xếp hạng dạng hàng chấm
+  function dotBar(frac, d) {
+    const N = 46, on = frac > 0 ? Math.max(1, Math.round(frac * N)) : 0;
+    let c = '';
+    for (let i = 0; i < N; i++) c += `<circle class="tdot ${i < on ? 'bar' : 'off'}" cx="${i * 6 + 3}" cy="3" r="2.1"${i < on ? ` style="--d:${d + i * 12}ms"` : ''}/>`;
+    return `<svg class="dotbar" viewBox="0 0 ${N * 6} 6" aria-hidden="true">${c}</svg>`;
+  }
+
   function tipBody() {
     const ms = monthsEnding(6), vals = tipByMonth(ms);
     if (!Math.max(...vals)) return '<div class="empty-sm">Chưa có tip. Thêm khoản thu và chọn danh mục Tip</div>';
-    if (tipView() === 'chart') return monthBarChart(ms, vals, 'Tip theo tháng', 'Chưa có tip');
+    if (tipView() === 'chart') return tipDotChart(ms, vals);
     // xếp hạng: tháng nhiều tip nhất đứng đầu, thanh so với tháng đứng đầu
     const rows = ms.map((m, i) => ({ m, v: vals[i], i })).sort((a, b) => b.v - a.v || b.i - a.i);
     const max = rows[0].v, selRank = rows.findIndex((r) => r.m === state.month) + 1, selV = vals[ms.indexOf(state.month)];
@@ -398,7 +426,7 @@
       <div class="rrow${r.m === state.month ? ' sel' : ''}${r.v ? '' : ' zero'}" style="--d:${k * 60}ms">
         <span class="rk num">${k + 1}</span><span class="rl">${tipMonthName(r.m)}</span>
         <span class="ra num">${r.v ? money(r.v) : '—'}</span><span class="rp num">${r.v ? Math.round((r.v / max) * 100) + '%' : ''}</span>
-        <div class="dprog thin"><i style="width:${r.v ? (r.v / max) * 100 : 0}%;--d:${k * 60 + 80}ms"></i></div>
+        ${dotBar(r.v / max, k * 60 + 80)}
       </div>`).join('');
   }
   function tipCard() {
