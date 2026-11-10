@@ -58,7 +58,7 @@ svg.i.fill { fill: currentColor; stroke: none; }
 .icon-btn:active { color: var(--text); }
 
 /* typography */
-h1.thin { margin: 22px 2px 0; font-size: clamp(40px, 12vw, 52px); font-weight: 300; letter-spacing: -0.055em; line-height: 1; background: linear-gradient(180deg, #ffffff 20%, #a79f9c 120%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+h1.thin { margin: 22px 2px 0; font-size: clamp(40px, 12vw, 52px); font-weight: 300; letter-spacing: -0.055em; line-height: 1; padding: 0.04em 0.08em 0.18em 0; margin-bottom: -0.18em; background: linear-gradient(180deg, #ffffff 20%, #a79f9c 120%); -webkit-background-clip: text; background-clip: text; color: transparent; }
 h1.thin.sm { font-size: 34px; margin-top: 18px; }
 .tick { display: block; width: 18px; height: 2px; border-radius: 1px; background: var(--orange); margin: 10px 2px 14px; box-shadow: 0 0 8px rgba(255, 97, 41, 0.7); }
 .label { color: var(--muted); font-size: 13px; }
