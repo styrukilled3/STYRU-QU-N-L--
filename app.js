@@ -143,9 +143,9 @@
 
   /* ---------- motion ---------- */
   const MOTION_KEY = 'dong-tien:motion';
-  const motionPref = () => { try { return localStorage.getItem(MOTION_KEY) !== 'off'; } catch { return true; } };
+  const motionPref = () => { try { return localStorage.getItem(MOTION_KEY) || 'auto'; } catch { return 'auto'; } };
   const reducedOS = () => !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-  const motionOn = () => motionPref() && !reducedOS();
+  const motionOn = () => { const p = motionPref(); return p === 'on' ? true : p === 'off' ? false : !reducedOS(); };
   const applyMotion = () => { document.documentElement.dataset.motion = motionOn() ? 'on' : 'off'; };
   const shown = new Map();
 
@@ -390,7 +390,7 @@
       <section class="card glass">${(() => { const n = state.txs.filter((t) => t.demo).length; return n
         ? `<button class="set-row" data-act="demo-clear"><span>Xoá dữ liệu mẫu<small>${n} giao dịch mẫu, không ảnh hưởng dữ liệu thật</small></span></button>`
         : '<button class="set-row" data-act="demo-add"><span>Nạp dữ liệu mẫu<small>Thêm giao dịch giả của tháng này để xem giao diện và animation</small></span></button>'; })()}</section>
-      <section class="card glass"><button class="set-row" data-act="toggle-motion"><span>Chuyển động<small>${reducedOS() ? 'Hệ điều hành đang bật giảm chuyển động' : 'Nền động, số đếm, biểu đồ vẽ dần. Tắt nếu máy giật'}</small></span><b>${motionOn() ? 'Bật' : 'Tắt'}</b></button></section>
+      <section class="card glass"><button class="set-row" data-act="toggle-motion"><span>Chuyển động<small>${reducedOS() && motionPref() === 'auto' ? 'Máy đang bật Giảm chuyển động nên hiệu ứng đang tắt. Bấm để ép bật' : 'Nền động, số đếm, biểu đồ vẽ dần. Tắt nếu máy giật'}</small></span><b>${motionOn() ? 'Bật' : 'Tắt'}</b></button></section>
       <section class="card glass"><button class="set-row danger" data-act="wipe"><span>Xoá toàn bộ dữ liệu</span></button></section>
       <section class="card glass"><div class="label">Cài lên màn hình chính. iOS: Safari &gt; Chia sẻ &gt; Thêm vào MH chính. Android: Chrome &gt; menu &gt; Cài đặt ứng dụng. Cài rồi thì iOS không tự dọn dữ liệu.</div></section>`;
   }
@@ -564,7 +564,7 @@
       await dbDelMany(state.txs.filter((t) => t.demo).map((t) => t.id)); state.txs = await dbAll();
       render(); toast('Đã xoá dữ liệu mẫu');
     },
-    'toggle-motion': () => { try { localStorage.setItem(MOTION_KEY, motionPref() ? 'off' : 'on'); } catch { /* ignore */ } applyMotion(); render(); },
+    'toggle-motion': () => { try { localStorage.setItem(MOTION_KEY, motionOn() ? 'off' : 'on'); } catch { /* ignore */ } applyMotion(); render(); },
     today: () => { state.month = monthOf(todayStr()); render(); },
     close: closeSheet,
     save,

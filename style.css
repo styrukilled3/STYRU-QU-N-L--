@@ -217,6 +217,3 @@ h1.thin.sm { font-size: 34px; margin-top: 18px; }
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
 
 html[data-motion="off"] *, html[data-motion="off"] *::after { animation: none !important; }
-@media (prefers-reduced-motion: reduce) {
-  *, *::after { animation: none !important; }
-}
