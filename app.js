@@ -1318,12 +1318,13 @@
     $('#lock').classList.add('show');
     const face = mode === 'verify' && opts.boot && getFace();
     $('#lk-face').hidden = !face;
-    if (Date.now() < lk.until) lockCountdown(); else if (face) tryFace();
+    if (Date.now() < lk.until) lockCountdown();
+    else if (face) { if (document.documentElement.classList.contains('intro')) document.addEventListener('intro-done', tryFace, { once: true }); else tryFace(); }
   }
   function lockNow() {
     closeSheet(); closeDSheet();
     document.documentElement.classList.add('locked');
-    openLock('verify', { boot: true, onOk: () => { shown.clear(); render(); } });
+    openLock('verify', { boot: true, onOk: () => { shown.clear(); render(); replayEnter(); } });
   }
   async function forgotLock() {
     if (!confirm('Quên mẫu sẽ XOÁ TOÀN BỘ dữ liệu trong app (giao dịch, nợ) và tắt khóa. Không khôi phục được nếu chưa backup JSON. Tiếp tục?')) return;
@@ -1363,17 +1364,57 @@
     $('.dock').addEventListener('animationend', (e) => { const b = e.target.closest('.dk'); if (b && e.target.tagName === 'circle') b.classList.remove('rip'); });
   }
 
+  /* ---------- intro: chấm bay vào hình chữ P, chạy khi mở app mới ---------- */
+  function replayEnter() {
+    if (!motionOn()) return;
+    const app = $('#app');
+    app.classList.remove('enter'); void app.offsetWidth; app.classList.add('enter');
+    clearTimeout(enterTimer); enterTimer = setTimeout(() => app.classList.remove('enter'), 1400);
+  }
+  function runIntro() {
+    const root = document.documentElement, el = $('#intro');
+    if (!el) { root.classList.remove('intro'); return; }
+    const logo = $('#in-logo'), pat = ['111', '111', '100'];
+    let h = '';
+    const rnd = (a, b) => a + Math.random() * (b - a);
+    const vw = Math.max(innerWidth, 360), vh = Math.max(innerHeight, 640);
+    // 40 chấm li ti lao về tâm rồi tan, tạo cảm giác bị hút vào
+    for (let i = 0; i < 40; i++) {
+      const a = rnd(0, 6.283), r = rnd(Math.min(vw, vh) * 0.45, Math.max(vw, vh) * 0.6);
+      const ea = rnd(0, 6.283), er = rnd(0, 50);
+      h += `<i class="in-sw" style="--x0:${(Math.cos(a) * r).toFixed(0)}px;--y0:${(Math.sin(a) * r).toFixed(0)}px;--xe:${(Math.cos(ea) * er).toFixed(0)}px;--ye:${(Math.sin(ea) * er).toFixed(0)}px;--s:${rnd(2.5, 5).toFixed(1)}px;--t:${rnd(0.9, 1.5).toFixed(2)}s;--d:${rnd(0, 0.55).toFixed(2)}s"></i>`;
+    }
+    pat.forEach((row, y) => [...row].forEach((ch, x) => {
+      const a = rnd(0, 6.283), r = rnd(Math.min(vw, vh) * 0.35, Math.max(vw, vh) * 0.5);
+      const lit = ch === '1';
+      h += `<i class="in-dot${lit ? ' lit' : ''}" style="left:${12 + x * 48}px;top:${12 + y * 48}px;--x0:${(Math.cos(a) * r).toFixed(0)}px;--y0:${(Math.sin(a) * r).toFixed(0)}px;--o:${lit ? 1 : 0.2};--d:${(0.1 + (y * 3 + x) * 0.055).toFixed(2)}s"></i>`;
+    }));
+    logo.innerHTML = h;
+    let done = false;
+    const end = () => {
+      if (done) return; done = true;
+      clearTimeout(auto);
+      el.classList.add('out'); root.classList.remove('intro');
+      document.dispatchEvent(new Event('intro-done'));
+      if (!root.classList.contains('locked')) replayEnter();
+      setTimeout(() => el.remove(), 700);
+    };
+    const auto = setTimeout(end, 2500);
+    el.addEventListener('pointerdown', end, { once: true });
+  }
+
   (async function boot() {
+    if (document.documentElement.classList.contains('intro')) runIntro();
     applyMotion();
     initDock();
-    if (getLock()) openLock('verify', { boot: true, onOk: () => { shown.clear(); render(); } });
+    if (getLock()) openLock('verify', { boot: true, onOk: () => { shown.clear(); render(); replayEnter(); } });
     try { state.txs = await dbAll(); state.debts = await dbAllS('debts'); state.pays = await dbAllS('pays'); } catch { toast('Không mở được bộ nhớ trình duyệt'); }
     render();
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
     if ('serviceWorker' in navigator && location.protocol !== 'file:') {
       const had = !!navigator.serviceWorker.controller;
       let reloaded = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => { if (had && !reloaded) { reloaded = true; location.reload(); } });
+      navigator.serviceWorker.addEventListener('controllerchange', () => { if (had && !reloaded) { reloaded = true; try { sessionStorage.setItem('dt-skip-intro', '1'); } catch { /* ignore */ } location.reload(); } });
       navigator.serviceWorker.register('sw.js').catch(() => {});
     }
   })();

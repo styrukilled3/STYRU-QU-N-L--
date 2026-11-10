@@ -375,3 +375,21 @@ html[data-motion="off"] .tipseg::before { transition: none; }
   .card, .tile { transition: transform 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.35); }
   .card:active, .tile:active { transform: scale(0.985); transition-duration: 0.12s; }
 }
+
+/* ---------- intro: chấm bay vào hình chữ P ---------- */
+#intro { position: fixed; inset: 0; z-index: 200; display: none; flex-direction: column; align-items: center; justify-content: center; touch-action: none; }
+html.intro #intro, #intro.out { display: flex; }
+html.intro #stage, html.intro .dock { visibility: hidden; }
+#intro.out { pointer-events: none; animation: introout 0.55s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+@keyframes introout { to { opacity: 0; transform: scale(1.06); } }
+.in-logo { position: relative; width: 120px; height: 120px; }
+.in-dot { position: absolute; width: 24px; height: 24px; margin: -12px; border-radius: 50%; background: #fff; opacity: 0;
+  animation: indot 1.15s var(--d) cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+.in-dot.lit { animation: indot 1.15s var(--d) cubic-bezier(0.2, 0.9, 0.3, 1.2) both, inglow 1s 1.35s ease-out both; }
+@keyframes indot { from { transform: translate(var(--x0), var(--y0)) scale(0.25); opacity: 0; } 30% { opacity: 1; } to { transform: translate(0, 0) scale(1); opacity: var(--o); } }
+@keyframes inglow { 0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); } 35% { box-shadow: 0 0 30px 8px rgba(255, 255, 255, 0.75); } 100% { box-shadow: 0 0 14px 2px rgba(255, 255, 255, 0.35); } }
+.in-sw { position: absolute; left: 60px; top: 60px; width: var(--s); height: var(--s); margin: calc(var(--s) / -2); border-radius: 50%; background: #fff; opacity: 0;
+  animation: insw var(--t) var(--d) cubic-bezier(0.5, 0, 0.8, 0.6) both; }
+@keyframes insw { from { transform: translate(var(--x0), var(--y0)); opacity: 0; } 25% { opacity: 0.8; } to { transform: translate(var(--xe), var(--ye)); opacity: 0; } }
+.in-word { margin-top: 38px; font-size: 30px; font-weight: 200; letter-spacing: -0.055em; color: var(--text); animation: inword 0.9s 1.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes inword { from { opacity: 0; letter-spacing: 0.22em; } }

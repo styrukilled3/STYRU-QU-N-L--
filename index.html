@@ -13,6 +13,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <script>try{if(localStorage.getItem('dong-tien:lock'))document.documentElement.classList.add('locked')}catch(e){}</script>
+<script>try{var r=document.documentElement,m=localStorage.getItem('dong-tien:motion'),rm=matchMedia('(prefers-reduced-motion: reduce)').matches;if((m==='on'||(m!=='off'&&!rm))&&!sessionStorage.getItem('dt-skip-intro')){r.classList.add('intro');setTimeout(function(){r.classList.remove('intro')},4500)}sessionStorage.removeItem('dt-skip-intro')}catch(e){}</script>
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -93,6 +94,7 @@
   </div>
 </div>
 
+<div id="intro" aria-hidden="true"><div class="in-logo" id="in-logo"></div><div class="in-word">Dòng tiền</div></div>
 <div id="lock" aria-label="Khóa app">
   <div class="lk-in">
     <div class="lk-logo" id="lk-logo" aria-hidden="true"></div>
