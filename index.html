@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dòng Tiền</title>
+<meta name="theme-color" content="#050403">
+<meta name="color-scheme" content="dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Dòng Tiền">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main id="app"></main>
+
+<nav class="dock glass" aria-label="Điều hướng">
+  <button class="dk" data-tab="home" aria-label="Tổng quan"><svg class="i" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg></button>
+  <button class="dk plus" data-act="add" aria-label="Thêm giao dịch"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+  <button class="dk" data-tab="list" aria-label="Giao dịch"><svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg></button>
+</nav>
+
+<div class="overlay" id="sheet" aria-hidden="true">
+  <div class="bd" data-act="close"></div>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="sh-title">
+    <div class="grab"></div>
+    <div class="sh-head">
+      <h3 id="sh-title">Thêm giao dịch</h3>
+      <button class="icon-btn" data-act="close" aria-label="Đóng"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="seg type glass" id="f-type">
+      <button type="button" data-type="expense">Chi</button>
+      <button type="button" data-type="income">Thu</button>
+    </div>
+    <div class="amount-wrap">
+      <input id="f-amount" class="amount num expense" inputmode="numeric" autocomplete="off" placeholder="0" aria-label="Số tiền">
+      <span class="cur">₫</span>
+    </div>
+    <div class="quick" id="f-quick">
+      <button type="button" class="chip" data-mul="1000">000</button>
+      <button type="button" class="chip" data-add="10000">+10k</button>
+      <button type="button" class="chip" data-add="50000">+50k</button>
+      <button type="button" class="chip" data-add="100000">+100k</button>
+      <button type="button" class="chip" data-add="500000">+500k</button>
+      <button type="button" class="chip" data-add="1000000">+1tr</button>
+    </div>
+    <div class="cats" id="f-cats"></div>
+    <div class="row2">
+      <input id="f-note" class="field" placeholder="Ghi chú" autocomplete="off" aria-label="Ghi chú">
+      <input id="f-date" class="field" type="date" aria-label="Ngày" style="width:150px">
+    </div>
+    <button class="btn primary" data-act="save">Lưu</button>
+    <button class="btn ghost" id="f-del" data-act="delete" hidden>Xoá giao dịch</button>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<input type="file" id="f-import" accept="application/json,.json" hidden>
+
+<script src="app.js"></script>
+</body>
+</html>
