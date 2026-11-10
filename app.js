@@ -79,6 +79,7 @@
   const dbAll = () => run('readonly', (s) => s.getAll());
   const dbPut = (r) => run('readwrite', (s) => s.put(r));
   const dbDel = (id) => run('readwrite', (s) => s.delete(id));
+  const dbDelMany = (ids) => run('readwrite', (s) => { ids.forEach((id) => s.delete(id)); });
   const dbClear = () => run('readwrite', (s) => s.clear());
   const dbBulk = (arr) => run('readwrite', (s) => { arr.forEach((r) => s.put(r)); });
 
@@ -386,6 +387,9 @@
         <button class="set-row" data-act="import"><span>Khôi phục từ JSON<small>Gộp vào dữ liệu hiện tại, trùng ID thì ghi đè</small></span></button>
         <button class="set-row" data-act="export-csv"><span>Xuất CSV<small>Mở bằng Excel hoặc Google Sheets</small></span></button>
       </section>
+      <section class="card glass">${(() => { const n = state.txs.filter((t) => t.demo).length; return n
+        ? `<button class="set-row" data-act="demo-clear"><span>Xoá dữ liệu mẫu<small>${n} giao dịch mẫu, không ảnh hưởng dữ liệu thật</small></span></button>`
+        : '<button class="set-row" data-act="demo-add"><span>Nạp dữ liệu mẫu<small>Thêm giao dịch giả của tháng này để xem giao diện và animation</small></span></button>'; })()}</section>
       <section class="card glass"><button class="set-row" data-act="toggle-motion"><span>Chuyển động<small>${reducedOS() ? 'Hệ điều hành đang bật giảm chuyển động' : 'Nền động, số đếm, biểu đồ vẽ dần. Tắt nếu máy giật'}</small></span><b>${motionOn() ? 'Bật' : 'Tắt'}</b></button></section>
       <section class="card glass"><button class="set-row danger" data-act="wipe"><span>Xoá toàn bộ dữ liệu</span></button></section>
       <section class="card glass"><div class="label">Cài lên màn hình chính. iOS: Safari &gt; Chia sẻ &gt; Thêm vào MH chính. Android: Chrome &gt; menu &gt; Cài đặt ứng dụng. Cài rồi thì iOS không tự dọn dữ liệu.</div></section>`;
@@ -481,6 +485,23 @@
     toast('Đã xoá', 'Hoàn tác', async () => { await dbPut(t); state.txs.push(t); render(); });
   }
 
+  /* ---------- demo data (gắn cờ demo, xoá được) ---------- */
+  function demoTxs() {
+    const t = todayStr(), mo = monthOf(t), last = +t.slice(8, 10);
+    let seed = 7;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const pick = (a) => a[Math.floor(rnd() * a.length)];
+    const out = [];
+    const mk = (type, amount, cat, note, d) => out.push({ id: 'demo-' + out.length, type, amount, cat, note, date: `${mo}-${pad(d)}`, createdAt: 1000 + out.length, demo: true });
+    mk('income', 18000000, 'salary', 'Lương tháng', Math.min(5, last));
+    if (last >= 3) mk('income', 6500000, 'freelance', 'Branding project', last - 2);
+    const cats = ['food', 'food', 'food', 'move', 'home', 'shop', 'fun', 'health', 'learn', 'tool', 'other'];
+    const notes = { food: ['Cơm trưa', 'Cà phê', 'Trà sữa'], move: ['Grab', 'Xăng'], home: ['Tiền điện'], shop: ['Font license'], fun: ['Xem phim'], health: ['Thuốc'], learn: ['Khoá học'], tool: ['Adobe CC', 'Figma'], other: [''] };
+    const amts = [25, 35, 45, 60, 120, 250, 480, 1200, 3000].map((x) => x * 1000);
+    for (let d = 1; d <= last; d++) for (let k = (rnd() * 4) | 0; k > 0; k--) { const c = pick(cats); mk('expense', pick(amts), c, pick(notes[c]), d); }
+    return out;
+  }
+
   /* ---------- export / import ---------- */
   async function saveFile(name, mime, text) {
     const file = new File([text], name, { type: mime });
@@ -514,6 +535,7 @@
     id: t.id, type: t.type, amount: Math.round(+t.amount),
     cat: CAT_MAP[t.cat] ? t.cat : (t.type === 'income' ? 'inc_other' : 'other'),
     note: String(t.note || '').slice(0, 200), date: t.date, createdAt: +t.createdAt || Date.now(),
+    ...(t.demo ? { demo: true } : {}),
   });
   async function importJSON(file) {
     try {
@@ -534,6 +556,14 @@
     next: () => { state.month = shiftMonth(state.month, 1); render(); },
     add: () => openSheet(),
     'toggle-data': () => { state.tab = state.tab === 'settings' ? 'home' : 'settings'; render(); window.scrollTo(0, 0); },
+    'demo-add': async () => {
+      await dbBulk(demoTxs()); state.txs = await dbAll(); state.month = monthOf(todayStr()); state.tab = 'home';
+      render(); window.scrollTo(0, 0); toast('Đã nạp dữ liệu mẫu');
+    },
+    'demo-clear': async () => {
+      await dbDelMany(state.txs.filter((t) => t.demo).map((t) => t.id)); state.txs = await dbAll();
+      render(); toast('Đã xoá dữ liệu mẫu');
+    },
     'toggle-motion': () => { try { localStorage.setItem(MOTION_KEY, motionPref() ? 'off' : 'on'); } catch { /* ignore */ } applyMotion(); render(); },
     today: () => { state.month = monthOf(todayStr()); render(); },
     close: closeSheet,
@@ -584,6 +614,11 @@
     try { state.txs = await dbAll(); } catch { toast('Không mở được bộ nhớ trình duyệt'); }
     render();
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
-    if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
+    if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+      const had = !!navigator.serviceWorker.controller;
+      let reloaded = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => { if (had && !reloaded) { reloaded = true; location.reload(); } });
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
   })();
 })();
