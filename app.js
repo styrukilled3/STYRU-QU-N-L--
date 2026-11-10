@@ -327,8 +327,8 @@
         <div class="bigrow">${dm((neg ? '-' : '') + nf.format(Math.abs(s.net)), 8, neg, 'hero', s.net)}<span class="unit">₫</span></div>
       </section>
       <div class="tiles">
-        <div class="tile glass"><div class="label">Thu</div><i class="tick"></i><div class="bigrow">${tIn.svg}<span class="unit">${tIn.unit}</span></div><div class="sub">${nIn} khoản</div></div>
-        <div class="tile glass"><div class="label">Chi</div><i class="tick"></i><div class="bigrow">${tOut.svg}<span class="unit">${tOut.unit}</span></div><div class="sub">${nOut} khoản</div></div>
+        <div class="tile glass in"><div class="label">Thu</div><i class="tick"></i><div class="bigrow">${tIn.svg}<span class="unit">${tIn.unit}</span></div><div class="sub">${nIn} khoản</div></div>
+        <div class="tile glass out"><div class="label">Chi</div><i class="tick"></i><div class="bigrow">${tOut.svg}<span class="unit">${tOut.unit}</span></div><div class="sub">${nOut} khoản</div></div>
       </div>
       ${backupNotice()}
       <section class="card glass"><h2><span>Luỹ kế trong tháng</span></h2>${lineChart(list)}</section>
