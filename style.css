@@ -304,3 +304,11 @@ html, body { touch-action: pan-y; overflow-x: hidden; overflow-x: clip; overscro
 .tdot.off { fill: rgba(255, 255, 255, 0.1); animation: none; }
 .dotbar { grid-column: 1 / -1; width: 100%; height: auto; display: block; margin-top: 8px; }
 .rrow.sel .tdot.bar { fill: var(--orange); filter: drop-shadow(0 0 2px rgba(255, 97, 41, 0.6)); }
+
+.tdot.ln { fill: #fff; }
+.legend2 { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 12px; font-size: 12.5px; color: var(--muted); }
+.legend2 .lg { display: inline-flex; align-items: center; gap: 6px; }
+.legend2 .lg i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255, 255, 255, 0.7); }
+.legend2 .lg b { font-weight: 500; color: var(--text); }
+.legend2 .lg.sel, .legend2 .lg.sel b { color: var(--orange); }
+.legend2 .lg.sel i { background: var(--orange); box-shadow: 0 0 6px rgba(255, 97, 41, 0.8); }
