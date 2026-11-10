@@ -386,7 +386,7 @@
   const tipByMonth = (ms) => ms.map((m) => state.txs.filter((t) => t.type === 'income' && t.cat === 'tip' && t.date.startsWith(m)).reduce((a, t) => a + t.amount, 0));
   const tipMonthName = (m) => `Tháng ${+m.slice(5)}${m.slice(0, 4) !== state.month.slice(0, 4) ? ' ' + m.slice(0, 4) : ''}`;
 
-  // cột dạng ma trận chấm: mỗi tháng một cột 4 chấm ngang, cao tối đa 15 chấm, chấm to ở đáy nhỏ dần lên đỉnh
+  // cột dạng ma trận chấm: mỗi tháng một cột 4 chấm ngang, cao tối đa 15 chấm, chấm to và đậm ở đáy, nhỏ và mờ dần lên đỉnh
   function tipDotChart(ms, vals) {
     const W = 340, H = 170, bot = 24, cell = 8, cols = 4, rows = 15, base = H - bot;
     const max = Math.max(...vals), step = (W - 12) / ms.length;
@@ -395,10 +395,10 @@
       const x0 = 6 + i * step + (step - cols * cell) / 2, sel = m === state.month;
       const fill = vals[i] ? Math.max(1, Math.round((vals[i] / max) * rows)) : 0;
       for (let r = 0; r < rows; r++) {
-        const rad = (3.7 - 2.7 * (r / (rows - 1))).toFixed(2), on = r < fill;
+        const rad = (3.7 - 2.7 * (r / (rows - 1))).toFixed(2), on = r < fill, fade = (1 - 0.84 * (r / (rows - 1))).toFixed(2); // càng lên cao càng mờ
         for (let c = 0; c < cols; c++) {
           const cx = (x0 + (c + 0.5) * cell).toFixed(1), cy = (base - (r + 0.5) * cell).toFixed(1);
-          g += `<circle class="tdot ${on ? (sel ? 'hot' : 'on') : 'off'}" cx="${cx}" cy="${cy}" r="${rad}"${on ? ` style="--d:${r * 28 + i * 60 + 60}ms"` : ''}/>`;
+          g += `<circle class="tdot ${on ? (sel ? 'hot' : 'on') : 'off'}" cx="${cx}" cy="${cy}" r="${rad}"${on ? ` style="--d:${r * 28 + i * 60 + 60}ms;fill-opacity:${fade}"` : ''}/>`;
         }
       }
       const cx = x0 + (cols * cell) / 2;
