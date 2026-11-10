@@ -619,11 +619,18 @@
   }
 
   // đổi tab: trang cũ mờ đi (ease-in) rồi trang mới trượt vào lần lượt (ease-in-out); đổi dữ liệu thì vẽ lại ngay
-  let lastTab = null, swapTimer;
+  let lastTab = null, lastMonth = null, swapTimer;
+  // đổi nội dung body của card toggle, pill trượt nhờ giữ nguyên phần tử, body có hiệu ứng vào nhẹ
+  function swapBody(el, html) {
+    if (!el) return;
+    el.innerHTML = html;
+    el.classList.remove('swapin'); void el.offsetWidth; el.classList.add('swapin');
+  }
   function render() {
     const app = $('#app');
     const tabChanged = lastTab !== null && lastTab !== state.tab;
-    lastTab = state.tab;
+    const stagger = motionOn() && !tabChanged && (lastTab === null || lastMonth !== state.month);
+    lastTab = state.tab; lastMonth = state.month;
     syncDock();
     clearTimeout(swapTimer);
     if (tabChanged && motionOn()) {
@@ -636,6 +643,7 @@
     }
     app.classList.remove('leave', 'enter');
     paint();
+    if (stagger) { void app.offsetWidth; app.classList.add('enter'); }
   }
 
   const viewFor = (tab) => (tab === 'home' ? viewHome() : tab === 'list' ? viewList() : tab === 'debt' ? viewDebt() : viewSettings());
@@ -956,13 +964,19 @@
     if (d.cumview) {
       try { localStorage.setItem(CUMVIEW_KEY, d.cumview); } catch { /* ignore */ }
       const card = $('[data-cumcard]');
-      if (card) card.outerHTML = cumCard();
+      if (card) {
+        $$('.tipseg button', card).forEach((b) => b.classList.toggle('on', b.dataset.cumview === d.cumview));
+        swapBody($('.cumbody', card), d.cumview === 'compare' ? cumCompare() : lineChart(monthTxs()));
+      }
       return;
     }
     if (d.tipview) {
       try { localStorage.setItem(TIPVIEW_KEY, d.tipview); } catch { /* ignore */ }
       const card = $('[data-tipcard]');
-      if (card) card.outerHTML = tipCard();
+      if (card) {
+        $$('.tipseg button', card).forEach((b) => b.classList.toggle('on', b.dataset.tipview === d.tipview));
+        swapBody($('.tipbody', card), tipBody());
+      }
       return;
     }
     if (d.dedit) { const x = state.debts.find((y) => y.id === d.dedit); if (x) openDSheet('debt', x); return; }
