@@ -1,4 +1,4 @@
-const V = 'dong-tien-v26';
+const V = 'dong-tien-v27';
 const ASSETS = ['./', 'index.html', 'style.css', 'app.js', 'manifest.json', 'icon.svg', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', (e) => {
@@ -27,4 +27,19 @@ self.addEventListener('fetch', (e) => {
       }
     })
   );
+});
+
+// thông báo đẩy 19:00: push không kèm nội dung, nội dung đặt ở đây
+self.addEventListener('push', (e) => {
+  e.waitUntil(self.registration.showNotification('Dòng Tiền', {
+    body: 'Ghi thu chi hôm nay nhé',
+    icon: 'icon-192.png', badge: 'icon-192.png', tag: 'daily-reminder',
+  }));
+});
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+    for (const c of list) if ('focus' in c) return c.focus();
+    return self.clients.openWindow('./');
+  }));
 });
