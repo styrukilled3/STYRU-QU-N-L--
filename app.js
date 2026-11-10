@@ -45,6 +45,7 @@
     ],
     income: [
       { id: 'salary', name: 'Lương', color: '#ffffff' },
+      { id: 'tip', name: 'Tip', color: '#ffc9b0' },
       { id: 'freelance', name: 'Freelance', color: '#f2d5c7' },
       { id: 'bonus', name: 'Thưởng', color: '#cdb6ab' },
       { id: 'inc_other', name: 'Khác', color: '#8a7b74' },
@@ -330,6 +331,7 @@
         <div class="tile glass in"><div class="label">Thu</div><i class="tick"></i><div class="bigrow">${tIn.svg}<span class="unit">${tIn.unit}</span></div><div class="sub">${nIn} khoản</div></div>
         <div class="tile glass out"><div class="label">Chi</div><i class="tick"></i><div class="bigrow">${tOut.svg}<span class="unit">${tOut.unit}</span></div><div class="sub">${nOut} khoản</div></div>
       </div>
+      ${tipCard()}
       ${backupNotice()}
       <section class="card glass"><h2><span>Luỹ kế trong tháng</span></h2>${lineChart(list)}</section>
       <div class="tiles">
@@ -355,12 +357,10 @@
   }
   const monthsEnding = (n) => Array.from({ length: n }, (_, i) => shiftMonth(state.month, i - (n - 1)));
 
-  // cột trả nợ theo tháng, tháng đang chọn màu cam
-  function debtBarChart(st) {
-    const ms = monthsEnding(6);
-    const vals = ms.map((m) => st.pays.filter((p) => p.date.startsWith(m)).reduce((a, p) => a + p.amount, 0));
+  // cột theo tháng (dùng cho trả nợ và tip), tháng đang chọn màu cam
+  function monthBarChart(ms, vals, aria, emptyMsg) {
     const max = Math.max(...vals);
-    if (!max) return '<div class="empty-sm">Chưa trả khoản nào trong 6 tháng này</div>';
+    if (!max) return `<div class="empty-sm">${emptyMsg}</div>`;
     const W = 340, H = 170, top = 22, bot = 24, px = 6;
     const step = (W - px * 2) / ms.length, bw = Math.min(34, step * 0.56);
     let g = '';
@@ -372,7 +372,40 @@
         + `<text class="val mkt" x="${cx.toFixed(1)}" y="${(y - 6).toFixed(1)}" text-anchor="middle">${compact(vals[i])}</text>`;
       g += `<text x="${cx.toFixed(1)}" y="${H - 6}" text-anchor="middle"${sel ? ' style="fill:var(--orange)"' : ''}>T${+m.slice(5)}</text>`;
     });
-    return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Số nợ đã trả theo tháng"><line class="axis" x1="0" x2="${W}" y1="${H - bot}" y2="${H - bot}"/>${g}</svg>`;
+    return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${aria}"><line class="axis" x1="0" x2="${W}" y1="${H - bot}" y2="${H - bot}"/>${g}</svg>`;
+  }
+  function debtBarChart(st) {
+    const ms = monthsEnding(6);
+    const vals = ms.map((m) => st.pays.filter((p) => p.date.startsWith(m)).reduce((a, p) => a + p.amount, 0));
+    return monthBarChart(ms, vals, 'Số nợ đã trả theo tháng', 'Chưa trả khoản nào trong 6 tháng này');
+  }
+
+  /* ---------- tip ---------- */
+  const TIPVIEW_KEY = 'dong-tien:tipview';
+  const tipView = () => { try { return localStorage.getItem(TIPVIEW_KEY) === 'compare' ? 'compare' : 'chart'; } catch { return 'chart'; } };
+  const tipByMonth = (ms) => ms.map((m) => state.txs.filter((t) => t.type === 'income' && t.cat === 'tip' && t.date.startsWith(m)).reduce((a, t) => a + t.amount, 0));
+  const tipMonthName = (m) => `Tháng ${+m.slice(5)}${m.slice(0, 4) !== state.month.slice(0, 4) ? ' ' + m.slice(0, 4) : ''}`;
+
+  function tipBody() {
+    const ms = monthsEnding(6), vals = tipByMonth(ms);
+    if (!Math.max(...vals)) return '<div class="empty-sm">Chưa có tip. Thêm khoản thu và chọn danh mục Tip</div>';
+    if (tipView() === 'chart') return monthBarChart(ms, vals, 'Tip theo tháng', 'Chưa có tip');
+    // xếp hạng: tháng nhiều tip nhất đứng đầu, thanh so với tháng đứng đầu
+    const rows = ms.map((m, i) => ({ m, v: vals[i], i })).sort((a, b) => b.v - a.v || b.i - a.i);
+    const max = rows[0].v, selRank = rows.findIndex((r) => r.m === state.month) + 1, selV = vals[ms.indexOf(state.month)];
+    const sum = selV ? `${tipMonthName(state.month)} đứng hạng ${selRank}/${rows.length}` : `${tipMonthName(state.month)} chưa có tip`;
+    return `<div class="rsum">${sum}</div>` + rows.map((r, k) => `
+      <div class="rrow${r.m === state.month ? ' sel' : ''}${r.v ? '' : ' zero'}" style="--d:${k * 60}ms">
+        <span class="rk num">${k + 1}</span><span class="rl">${tipMonthName(r.m)}</span>
+        <span class="ra num">${r.v ? money(r.v) : '—'}</span><span class="rp num">${r.v ? Math.round((r.v / max) * 100) + '%' : ''}</span>
+        <div class="dprog thin"><i style="width:${r.v ? (r.v / max) * 100 : 0}%;--d:${k * 60 + 80}ms"></i></div>
+      </div>`).join('');
+  }
+  function tipCard() {
+    const v = tipView();
+    return `<section class="card glass" data-tipcard><h2><span>Tip</span>
+      <span class="tipseg"><button data-tipview="chart" class="${v === 'chart' ? 'on' : ''}">Biểu đồ</button><button data-tipview="compare" class="${v === 'compare' ? 'on' : ''}">So sánh</button></span></h2>
+      <div class="tipbody">${tipBody()}</div></section>`;
   }
 
   // dư nợ cuối mỗi tháng = tổng nợ hiện tại trừ số đã trả tới hết tháng đó
@@ -824,11 +857,17 @@
   };
 
   document.addEventListener('click', (e) => {
-    const el = e.target.closest('[data-act],[data-tab],[data-id],[data-f],[data-type],[data-add],[data-mul],[data-cat],[data-dedit],[data-dpay],[data-pid],[data-dsel],[data-dadd],[data-dmul]');
+    const el = e.target.closest('[data-tipview],[data-act],[data-tab],[data-id],[data-f],[data-type],[data-add],[data-mul],[data-cat],[data-dedit],[data-dpay],[data-pid],[data-dsel],[data-dadd],[data-dmul]');
     if (!el) return;
     const d = el.dataset;
     if (d.act) return ACTIONS[d.act] && ACTIONS[d.act]();
     if (d.tab) { state.tab = d.tab; render(); window.scrollTo(0, 0); return; }
+    if (d.tipview) {
+      try { localStorage.setItem(TIPVIEW_KEY, d.tipview); } catch { /* ignore */ }
+      const card = $('[data-tipcard]');
+      if (card) card.outerHTML = tipCard();
+      return;
+    }
     if (d.dedit) { const x = state.debts.find((y) => y.id === d.dedit); if (x) openDSheet('debt', x); return; }
     if (d.dpay) { openDSheet('pay', null, d.dpay); return; }
     if (d.pid) { const x = state.pays.find((y) => y.id === d.pid); if (x) openDSheet('pay', x); return; }

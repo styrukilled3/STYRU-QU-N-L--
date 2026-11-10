@@ -277,3 +277,21 @@ html, body { touch-action: pan-y; overflow-x: hidden; overflow-x: clip; overscro
 
 /* chặn trang bị kéo lệch ra ngoài làm rộng viewport trên iOS khi vuốt */
 #stage { overflow: hidden; overflow: clip; width: 100%; }
+
+/* tip */
+.card h2:has(.tipseg) { align-items: center; }
+.tipseg { display: inline-grid; grid-auto-flow: column; padding: 3px; border-radius: 8px; background: rgba(255, 255, 255, 0.07); }
+.tipseg button { height: 26px; padding: 0 12px; border-radius: 6px; font-size: 12px; color: var(--muted); font-weight: 500; transition: background 0.25s, color 0.25s; }
+.tipseg button.on { background: rgba(255, 255, 255, 0.16); color: var(--text); }
+.rsum { color: var(--muted); font-size: 13px; margin: 0 0 8px; }
+.rrow { display: grid; grid-template-columns: 22px 1fr auto 44px; column-gap: 10px; align-items: baseline; padding: 10px 0 9px; border-top: 1px solid var(--stroke); animation: rise 0.5s var(--d, 0ms) ease both; }
+.rsum + .rrow { border-top: 0; }
+.rk { color: var(--faint); font-size: 13px; }
+.ra { font-weight: 500; }
+.rp { color: var(--muted); text-align: right; font-size: 13px; }
+.rrow .dprog { grid-column: 1 / -1; margin-top: 8px; }
+.dprog.thin { height: 5px; }
+.rrow .dprog i { background: rgba(255, 255, 255, 0.55); }
+.rrow.sel .dprog i { background: linear-gradient(90deg, #ff8a5e, #ff6129); }
+.rrow.sel .rl, .rrow.sel .ra, .rrow.sel .rk { color: var(--orange); }
+.rrow.zero { opacity: 0.55; }
