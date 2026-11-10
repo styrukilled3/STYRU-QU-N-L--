@@ -619,7 +619,7 @@
   }
 
   // đổi tab: trang cũ mờ đi (ease-in) rồi trang mới trượt vào lần lượt (ease-in-out); đổi dữ liệu thì vẽ lại ngay
-  let lastTab = null, lastMonth = null, swapTimer;
+  let lastTab = null, lastMonth = null, swapTimer, enterTimer;
   // đổi nội dung body của card toggle, pill trượt nhờ giữ nguyên phần tử, body có hiệu ứng vào nhẹ
   function swapBody(el, html) {
     if (!el) return;
@@ -638,19 +638,35 @@
       swapTimer = setTimeout(() => {
         paint(); window.scrollTo(0, 0);
         app.classList.remove('leave'); void app.offsetWidth; app.classList.add('enter');
+        clearTimeout(enterTimer); enterTimer = setTimeout(() => app.classList.remove('enter'), 1400);
       }, 240);
       return;
     }
     app.classList.remove('leave', 'enter');
     paint();
-    if (stagger) { void app.offsetWidth; app.classList.add('enter'); }
+    if (stagger) { void app.offsetWidth; app.classList.add('enter'); clearTimeout(enterTimer); enterTimer = setTimeout(() => app.classList.remove('enter'), 1400); }
   }
 
   const viewFor = (tab) => (tab === 'home' ? viewHome() : tab === 'list' ? viewList() : tab === 'debt' ? viewDebt() : viewSettings());
   const syncDock = () => $$('.dock [data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === state.tab));
 
+  // card nằm dưới màn hình: giữ animation biểu đồ ở trạng thái chờ tới khi cuộn tới
+  let revealIO = null;
+  function armReveal() {
+    if (revealIO) revealIO.disconnect();
+    if (!motionOn() || !('IntersectionObserver' in window)) return;
+    revealIO = new IntersectionObserver((ents) => {
+      ents.forEach((en) => { if (en.isIntersecting) { en.target.classList.remove('rv'); revealIO.unobserve(en.target); } });
+    }, { threshold: 0.15 });
+    $$('#app .card').forEach((c) => {
+      if (c.getBoundingClientRect().top < innerHeight - 60) return;
+      c.classList.add('rv'); revealIO.observe(c);
+    });
+  }
+
   function paint() {
     $('#app').innerHTML = viewFor(state.tab);
+    armReveal();
     if (state.tab === 'list') renderListBody();
     if (state.tab === 'home' || state.tab === 'debt') runCounters();
     if (state.tab === 'settings') {

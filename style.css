@@ -364,3 +364,14 @@ html.locked #stage, html.locked .dock { visibility: hidden; }
 .swapin { animation: swapin 0.42s cubic-bezier(0.22, 1, 0.36, 1) both; }
 @keyframes swapin { from { opacity: 0; transform: translateY(8px); } }
 html[data-motion="off"] .tipseg::before { transition: none; }
+
+/* animation biểu đồ chỉ chạy khi card cuộn tới */
+.card.rv *, .card.rv *::before, .card.rv *::after { animation-play-state: paused !important; }
+/* thanh tick dài ra khi vào */
+.tick { transform-origin: left center; animation: tickgrow 0.7s 0.3s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes tickgrow { from { transform: scaleX(0); } }
+/* nhấn xuống khi chạm, bật lại có chút nảy */
+@media (hover: none) {
+  .card, .tile { transition: transform 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.35); }
+  .card:active, .tile:active { transform: scale(0.985); transition-duration: 0.12s; }
+}
