@@ -331,7 +331,6 @@
         <div class="tile glass in"><div class="label">Thu</div><i class="tick"></i><div class="bigrow">${tIn.svg}<span class="unit">${tIn.unit}</span></div><div class="sub">${nIn} khoản</div></div>
         <div class="tile glass out"><div class="label">Chi</div><i class="tick"></i><div class="bigrow">${tOut.svg}<span class="unit">${tOut.unit}</span></div><div class="sub">${nOut} khoản</div></div>
       </div>
-      ${tipCard()}
       ${backupNotice()}
       <section class="card glass"><h2><span>Luỹ kế trong tháng</span></h2>${lineChart(list)}</section>
       <div class="tiles">
@@ -339,7 +338,8 @@
         <div class="tile glass"><div class="label">Tiết kiệm</div><i class="tick"></i><div class="bigrow">${rate === null ? dm('-', 4.4, false) : dm(rate + '%', 4.4, rate < 0, 'rate', rate, '%')}</div><div class="sub">${rate === null ? 'Chưa có thu' : 'trên tổng thu'}</div></div>
       </div>
       <section class="card glass"><h2><span>Thu chi theo ngày</span><span class="legend"><span class="dot in"></span>Thu<span class="dot out"></span>Chi</span></h2>${flowChart(list)}</section>
-      <section class="card glass"><h2><span>Chi theo danh mục</span></h2>${catBreakdown(list, s.e)}</section>`;
+      <section class="card glass"><h2><span>Chi theo danh mục</span></h2>${catBreakdown(list, s.e)}</section>
+      ${tipCard()}`;
   }
 
   /* ---------- nợ ---------- */
