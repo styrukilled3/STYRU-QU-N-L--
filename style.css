@@ -327,6 +327,3 @@ html.locked #stage, html.locked .dock { visibility: hidden; }
 .lk-actions { display: flex; gap: 12px; margin-top: 30px; min-height: 44px; }
 .lk-actions button { min-height: 44px; padding: 0 18px; color: var(--muted); font-size: 14px; }
 .lk-actions button:active { color: var(--text); }
-
-/* nền lưới chấm, nằm trên blob, dưới nội dung */
-#dotbg { position: absolute; inset: 0; display: block; mix-blend-mode: screen; }
