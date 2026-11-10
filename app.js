@@ -857,6 +857,69 @@
     }
   });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSheet(); closeDSheet(); } });
+
+  /* ---------- vuốt ngang đổi tab: Tổng quan > Giao dịch > Nợ ---------- */
+  const TAB_ORDER = ['home', 'list', 'debt'];
+  const EASE = 'cubic-bezier(0.22, 0.8, 0.3, 1)';
+  const swipe = { on: false, drag: false, x0: 0, y0: 0, t0: 0, dx: 0, busy: false };
+  const swipeNeighbor = (dir) => TAB_ORDER[TAB_ORDER.indexOf(state.tab) + dir];
+  const clearAppStyle = () => { const a = $('#app'); a.style.transition = a.style.transform = a.style.opacity = ''; };
+
+  function swipeCommit(dir) {
+    const app = $('#app'), next = swipeNeighbor(dir);
+    if (!motionOn()) { state.tab = next; render(); window.scrollTo(0, 0); return; }
+    swipe.busy = true;
+    app.style.transition = 'transform 0.2s cubic-bezier(0.5, 0, 0.9, 0.6), opacity 0.2s ease-in';
+    app.style.transform = `translateX(${dir * -70}px)`; app.style.opacity = '0';
+    setTimeout(() => {
+      state.tab = next; lastTab = next; render(); window.scrollTo(0, 0);
+      app.style.transition = 'none'; app.style.transform = `translateX(${dir * 56}px)`; app.style.opacity = '0';
+      void app.offsetWidth;
+      app.style.transition = `transform 0.55s ${EASE}, opacity 0.4s ease-out`; app.style.transform = ''; app.style.opacity = '';
+      setTimeout(() => { clearAppStyle(); swipe.busy = false; }, 580);
+    }, 200);
+  }
+  function swipeCancel() {
+    const app = $('#app');
+    app.style.transition = `transform 0.35s ${EASE}, opacity 0.35s ease-out`; app.style.transform = ''; app.style.opacity = '';
+    setTimeout(clearAppStyle, 380);
+  }
+
+  document.addEventListener('touchstart', (e) => {
+    swipe.on = false; swipe.drag = false;
+    if (swipe.busy || e.touches.length !== 1 || !TAB_ORDER.includes(state.tab) || document.body.classList.contains('lock')) return;
+    if (e.target.closest('input, textarea, .overlay, .dock')) return;
+    const t = e.touches[0];
+    if (t.clientX < 16 || t.clientX > innerWidth - 16) return; // chừa mép màn hình cho cử chỉ của hệ điều hành
+    Object.assign(swipe, { on: true, x0: t.clientX, y0: t.clientY, t0: performance.now(), dx: 0 });
+  }, { passive: true });
+
+  document.addEventListener('touchmove', (e) => {
+    if (!swipe.on) return;
+    const t = e.touches[0], dx = t.clientX - swipe.x0, dy = t.clientY - swipe.y0;
+    if (!swipe.drag) {
+      if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) { swipe.on = false; return; }
+      if (Math.abs(dx) < 10 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
+      swipe.drag = true;
+    }
+    const dir = dx < 0 ? 1 : -1;
+    const shown = swipeNeighbor(dir) ? dx : dx * 0.22; // hết trang thì kéo nặng tay như dây thun
+    swipe.dx = dx;
+    const app = $('#app');
+    app.style.transition = 'none';
+    app.style.transform = `translateX(${shown.toFixed(1)}px)`;
+    app.style.opacity = String(1 - Math.min(Math.abs(shown) / 380, 0.5));
+  }, { passive: true });
+
+  const swipeEnd = () => {
+    if (!swipe.on || !swipe.drag) { swipe.on = false; return; }
+    swipe.on = false; swipe.drag = false;
+    const dx = swipe.dx, v = Math.abs(dx) / Math.max(1, performance.now() - swipe.t0), dir = dx < 0 ? 1 : -1;
+    if (swipeNeighbor(dir) && (Math.abs(dx) > 80 || (Math.abs(dx) > 30 && v > 0.5))) swipeCommit(dir);
+    else swipeCancel();
+  };
+  document.addEventListener('touchend', swipeEnd, { passive: true });
+  document.addEventListener('touchcancel', () => { if (swipe.drag) swipeCancel(); swipe.on = swipe.drag = false; }, { passive: true });
   $('#f-import').addEventListener('change', (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) importJSON(f); });
 
   /* ---------- boot ---------- */

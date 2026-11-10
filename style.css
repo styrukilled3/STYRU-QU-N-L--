@@ -263,3 +263,5 @@ html[data-motion="off"] *, html[data-motion="off"] *::after { animation: none !i
 .dpay { height: 44px; margin-top: 12px; }
 .dnew { margin-top: 14px; }
 #d-debts:empty { display: none !important; }
+
+html, body { touch-action: pan-y; }
