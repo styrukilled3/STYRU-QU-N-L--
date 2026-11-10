@@ -266,7 +266,7 @@ html[data-motion="off"] *, html[data-motion="off"] *::after { animation: none !i
 .dnew { margin-top: 14px; }
 #d-debts:empty { display: none !important; }
 
-html, body { touch-action: pan-y; }
+html, body { touch-action: pan-y; overflow-x: hidden; overflow-x: clip; overscroll-behavior-x: none; max-width: 100%; }
 
 /* ô Thu: trắng, ô Chi: cam */
 .tile.in .label { color: #fff; }
@@ -274,3 +274,6 @@ html, body { touch-action: pan-y; }
 .tile.in .dm { color: #fff; filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.3)); }
 .tile.out .label, .tile.out .unit { color: var(--orange); }
 .tile.out .dm { color: var(--orange); filter: drop-shadow(0 0 4px rgba(255, 97, 41, 0.5)); }
+
+/* chặn trang bị kéo lệch ra ngoài làm rộng viewport trên iOS khi vuốt */
+#stage { overflow: hidden; overflow: clip; width: 100%; }
