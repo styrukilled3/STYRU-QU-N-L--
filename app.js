@@ -112,22 +112,71 @@
     '+': ['00000', '00100', '00100', '11111', '00100', '00100', '00000'],
     '%': ['11001', '11010', '00010', '00100', '01000', '01011', '10011'],
   };
-  function dm(text, unit, neg) {
-    let x = 0, c = '';
+  const glyphCols = (text) => {
+    let x = 0;
+    for (const ch of text) { const g = GLYPH[ch]; x += g ? g[0].length + 1 : 3; }
+    return Math.max(1, x - 1);
+  };
+  function dotCircles(text, off) {
+    let x = off || 0, c = '';
     for (const ch of text) {
       const g = GLYPH[ch];
       if (!g) { x += 3; continue; }
       g.forEach((row, y) => { for (let i = 0; i < row.length; i++) if (row[i] === '1') c += `<circle cx="${x + i + 0.5}" cy="${y + 0.5}" r="0.4"/>`; });
       x += g[0].length + 1;
     }
-    const w = Math.max(1, x - 1);
-    return `<svg class="dm${neg ? ' neg' : ''}" viewBox="0 0 ${w} 7" style="width:${(w * unit).toFixed(0)}px;aspect-ratio:${w}/7" fill="currentColor" role="img" aria-label="${esc(text)}">${c}</svg>`;
+    return c;
+  }
+  // key + target: số này sẽ được đếm từ giá trị đang hiển thị tới target
+  function dm(text, unit, neg, key, target, suf) {
+    const w = glyphCols(text);
+    const data = key ? ` data-key="${key}" data-t="${target}" data-suf="${suf || ''}" data-u="${unit}" data-w="${w}"` : '';
+    return `<svg class="dm${neg ? ' neg' : ''}" viewBox="0 0 ${w} 7" style="width:${(w * unit).toFixed(0)}px;aspect-ratio:${w}/7" fill="currentColor" role="img" aria-label="${esc(text)}"${data}>${dotCircles(text, 0)}</svg>`;
   }
   // tiles dùng đơn vị nghìn để số đủ to, dễ đọc
-  function dmK(v, unit) {
-    return v >= 1000
-      ? { svg: dm(nf.format(Math.round(v / 1000)), unit), unit: 'nghìn ₫' }
-      : { svg: dm(nf.format(Math.round(v)), unit), unit: '₫' };
+  function dmK(v, unit, key) {
+    const k = v >= 1000;
+    const n = Math.round(k ? v / 1000 : v);
+    return { svg: dm(nf.format(n), unit, false, key, n), unit: k ? 'nghìn ₫' : '₫' };
+  }
+
+  /* ---------- motion ---------- */
+  const MOTION_KEY = 'dong-tien:motion';
+  const motionPref = () => { try { return localStorage.getItem(MOTION_KEY) !== 'off'; } catch { return true; } };
+  const reducedOS = () => !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const motionOn = () => motionPref() && !reducedOS();
+  const applyMotion = () => { document.documentElement.dataset.motion = motionOn() ? 'on' : 'off'; };
+  const shown = new Map();
+
+  function runCounters() {
+    const els = $$('.dm[data-key]');
+    if (!motionOn()) { els.forEach((el) => shown.set(el.dataset.key, +el.dataset.t)); return; }
+    els.forEach((el) => {
+      const key = el.dataset.key, to = +el.dataset.t, suf = el.dataset.suf || '';
+      const u = +el.dataset.u, W = +el.dataset.w;
+      const from = shown.has(key) ? shown.get(key) : 0;
+      shown.set(key, to);
+      if (from === to) return;
+      const fmt = (v) => (v < 0 ? '-' : '') + nf.format(Math.abs(Math.round(v))) + suf;
+      const Wm = Math.max(glyphCols(fmt(from)), W);
+      el.setAttribute('viewBox', `0 0 ${Wm} 7`);
+      el.style.width = (Wm * u).toFixed(0) + 'px';
+      el.style.aspectRatio = `${Wm}/7`;
+      const draw = (v) => { const t = fmt(v); el.innerHTML = dotCircles(t, Wm - glyphCols(t)); };
+      const t0 = performance.now(), dur = 850;
+      draw(from);
+      const step = (now) => {
+        if (!el.isConnected) return;
+        const p = Math.min(1, (now - t0) / dur);
+        draw(from + (to - from) * (1 - Math.pow(1 - p, 3)));
+        if (p < 1) { requestAnimationFrame(step); return; }
+        el.setAttribute('viewBox', `0 0 ${W} 7`);
+        el.style.width = (W * u).toFixed(0) + 'px';
+        el.style.aspectRatio = `${W}/7`;
+        el.innerHTML = dotCircles(fmt(to), 0);
+      };
+      requestAnimationFrame(step);
+    });
   }
 
   /* ---------- views ---------- */
@@ -194,12 +243,12 @@
     return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Dòng tiền luỹ kế trong tháng">
       <defs><linearGradient id="cumFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff6129" stop-opacity=".38"/><stop offset="1" stop-color="#ff6129" stop-opacity="0"/></linearGradient></defs>
       <line class="axis" x1="0" x2="${W}" y1="${Y(0).toFixed(1)}" y2="${Y(0).toFixed(1)}" stroke-dasharray="3 4"/>
-      <path d="${area}" fill="url(#cumFill)"/>
-      <path d="${line}" fill="none" stroke="#ff6129" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
-      <line x1="${mx.toFixed(1)}" x2="${mx.toFixed(1)}" y1="${my.toFixed(1)}" y2="${base}" stroke="#fff" stroke-opacity=".55" stroke-dasharray="2 3"/>
-      <circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="10" fill="#ff6129" fill-opacity=".28"/>
-      <circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="3.6" fill="#fff"/>
-      <text class="val" x="${lx.toFixed(1)}" y="${Math.max(11, my - 14).toFixed(1)}" text-anchor="middle">${v < 0 ? '-' : ''}${compact(Math.abs(v))}</text>
+      <path class="ar" d="${area}" fill="url(#cumFill)"/>
+      <path class="ln" pathLength="1" d="${line}" fill="none" stroke="#ff6129" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
+      <line class="mkl" x1="${mx.toFixed(1)}" x2="${mx.toFixed(1)}" y1="${my.toFixed(1)}" y2="${base}" stroke="#fff" stroke-opacity=".55" stroke-dasharray="2 3"/>
+      <circle class="pulse" cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="10" fill="#ff6129" fill-opacity=".35"/>
+      <circle class="mk" cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="3.6" fill="#fff"/>
+      <text class="val mkt" x="${lx.toFixed(1)}" y="${Math.max(11, my - 14).toFixed(1)}" text-anchor="middle">${v < 0 ? '-' : ''}${compact(Math.abs(v))}</text>
       ${labels}</svg>`;
   }
 
@@ -220,11 +269,11 @@
       const x = (px + i * step + (step - bw) / 2).toFixed(1);
       if (inc[i]) {
         const h = Math.max(3, (inc[i] / max) * half);
-        bars += `<rect x="${x}" y="${(mid - h - 1).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="${(bw / 2).toFixed(1)}" fill="var(--in)" fill-opacity=".9"/>`;
+        bars += `<rect class="bar up" style="--d:${Math.min(i * 16, 640) + 80}ms" x="${x}" y="${(mid - h - 1).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="${(bw / 2).toFixed(1)}" fill="var(--in)" fill-opacity=".9"/>`;
       }
       if (exp[i]) {
         const h = Math.max(3, (exp[i] / max) * half);
-        bars += `<rect x="${x}" y="${mid + 1}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="${(bw / 2).toFixed(1)}" fill="var(--out)"/>`;
+        bars += `<rect class="bar dn" style="--d:${Math.min(i * 16, 640) + 80}ms" x="${x}" y="${mid + 1}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="${(bw / 2).toFixed(1)}" fill="var(--out)"/>`;
       }
     }
     const marks = [...new Set([1, 8, 15, 22, n])].filter((d) => d === n || n - d >= 3);
@@ -244,10 +293,10 @@
     for (const t of list) if (t.type === 'expense') m[t.cat] = (m[t.cat] || 0) + t.amount;
     const rows = Object.entries(m).sort((a, b) => b[1] - a[1]);
     if (!rows.length) return '<div class="empty-sm">Chưa có khoản chi</div>';
-    const stack = rows.map(([id, v]) => `<i style="width:${(v / total) * 100}%;background:${catOf(id).color}"></i>`).join('');
-    const rws = rows.map(([id, v]) => {
+    const stack = rows.map(([id, v], k) => `<i style="width:${(v / total) * 100}%;background:${catOf(id).color};--d:${k * 70}ms"></i>`).join('');
+    const rws = rows.map(([id, v], k) => {
       const c = catOf(id);
-      return `<div class="crow"><span class="dot" style="background:${c.color}"></span><span>${esc(c.name)}</span><span class="num">${money(v)}</span><span class="pct num">${Math.round((v / total) * 100)}%</span></div>`;
+      return `<div class="crow" style="--d:${220 + k * 60}ms"><span class="dot" style="background:${c.color}"></span><span>${esc(c.name)}</span><span class="num">${money(v)}</span><span class="pct num">${Math.round((v / total) * 100)}%</span></div>`;
     }).join('');
     return `<div class="stack">${stack}</div><div>${rws}</div>`;
   }
@@ -257,15 +306,15 @@
     const { elapsed } = monthInfo();
     const nIn = list.filter((t) => t.type === 'income').length, nOut = list.length - nIn;
     const neg = s.net < 0;
-    const tIn = dmK(s.i, 4.4), tOut = dmK(s.e, 4.4);
-    const avg = elapsed ? dmK(s.e / elapsed, 4.4) : { svg: dm('0', 4.4), unit: '₫' };
+    const tIn = dmK(s.i, 4.4, 'in'), tOut = dmK(s.e, 4.4, 'out');
+    const avg = elapsed ? dmK(s.e / elapsed, 4.4, 'avg') : { svg: dm('0', 4.4, false, 'avg', 0), unit: '₫' };
     const rate = s.i > 0 ? Math.round((s.net / s.i) * 100) : null;
     return `${header()}
       <section class="hero">
         <h1 class="thin">Dòng tiền</h1>
         <i class="tick"></i>
         <div class="hero-meta"><span class="label">Ròng tháng này</span><span class="tag"><i class="dot ${neg ? 'out' : 'in'}"></i>${neg ? 'Thâm hụt' : 'Thặng dư'}</span></div>
-        <div class="bigrow">${dm((neg ? '-' : '') + nf.format(Math.abs(s.net)), 8, neg)}<span class="unit">₫</span></div>
+        <div class="bigrow">${dm((neg ? '-' : '') + nf.format(Math.abs(s.net)), 8, neg, 'hero', s.net)}<span class="unit">₫</span></div>
       </section>
       <div class="tiles">
         <div class="tile glass"><div class="label">Thu</div><i class="tick"></i><div class="bigrow">${tIn.svg}<span class="unit">${tIn.unit}</span></div><div class="sub">${nIn} khoản</div></div>
@@ -275,7 +324,7 @@
       <section class="card glass"><h2><span>Luỹ kế trong tháng</span></h2>${lineChart(list)}</section>
       <div class="tiles">
         <div class="tile glass"><div class="label">Chi TB mỗi ngày</div><i class="tick"></i><div class="bigrow">${avg.svg}<span class="unit">${avg.unit}</span></div><div class="sub">${elapsed} ngày tính</div></div>
-        <div class="tile glass"><div class="label">Tiết kiệm</div><i class="tick"></i><div class="bigrow">${dm(rate === null ? '-' : rate + '%', 4.4, rate !== null && rate < 0)}</div><div class="sub">${rate === null ? 'Chưa có thu' : 'trên tổng thu'}</div></div>
+        <div class="tile glass"><div class="label">Tiết kiệm</div><i class="tick"></i><div class="bigrow">${rate === null ? dm('-', 4.4, false) : dm(rate + '%', 4.4, rate < 0, 'rate', rate, '%')}</div><div class="sub">${rate === null ? 'Chưa có thu' : 'trên tổng thu'}</div></div>
       </div>
       <section class="card glass"><h2><span>Thu chi theo ngày</span><span class="legend"><span class="dot in"></span>Thu<span class="dot out"></span>Chi</span></h2>${flowChart(list)}</section>
       <section class="card glass"><h2><span>Chi theo danh mục</span></h2>${catBreakdown(list, s.e)}</section>`;
@@ -337,6 +386,7 @@
         <button class="set-row" data-act="import"><span>Khôi phục từ JSON<small>Gộp vào dữ liệu hiện tại, trùng ID thì ghi đè</small></span></button>
         <button class="set-row" data-act="export-csv"><span>Xuất CSV<small>Mở bằng Excel hoặc Google Sheets</small></span></button>
       </section>
+      <section class="card glass"><button class="set-row" data-act="toggle-motion"><span>Chuyển động<small>${reducedOS() ? 'Hệ điều hành đang bật giảm chuyển động' : 'Nền động, số đếm, biểu đồ vẽ dần. Tắt nếu máy giật'}</small></span><b>${motionOn() ? 'Bật' : 'Tắt'}</b></button></section>
       <section class="card glass"><button class="set-row danger" data-act="wipe"><span>Xoá toàn bộ dữ liệu</span></button></section>
       <section class="card glass"><div class="label">Cài lên màn hình chính. iOS: Safari &gt; Chia sẻ &gt; Thêm vào MH chính. Android: Chrome &gt; menu &gt; Cài đặt ứng dụng. Cài rồi thì iOS không tự dọn dữ liệu.</div></section>`;
   }
@@ -345,6 +395,7 @@
     $$('.dock [data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === state.tab));
     $('#app').innerHTML = state.tab === 'home' ? viewHome() : state.tab === 'list' ? viewList() : viewSettings();
     if (state.tab === 'list') renderListBody();
+    if (state.tab === 'home') runCounters();
     if (state.tab === 'settings') {
       const el = $('#persist');
       if (navigator.storage && navigator.storage.persisted) navigator.storage.persisted().then((p) => { if (el) el.textContent = p ? 'Có' : 'Chưa'; });
@@ -483,6 +534,7 @@
     next: () => { state.month = shiftMonth(state.month, 1); render(); },
     add: () => openSheet(),
     'toggle-data': () => { state.tab = state.tab === 'settings' ? 'home' : 'settings'; render(); window.scrollTo(0, 0); },
+    'toggle-motion': () => { try { localStorage.setItem(MOTION_KEY, motionPref() ? 'off' : 'on'); } catch { /* ignore */ } applyMotion(); render(); },
     today: () => { state.month = monthOf(todayStr()); render(); },
     close: closeSheet,
     save,
@@ -528,6 +580,7 @@
 
   /* ---------- boot ---------- */
   (async function boot() {
+    applyMotion();
     try { state.txs = await dbAll(); } catch { toast('Không mở được bộ nhớ trình duyệt'); }
     render();
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});

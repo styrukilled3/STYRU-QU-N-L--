@@ -25,15 +25,6 @@ html { background: var(--bg); }
 html, body { margin: 0; color: var(--text); font-family: var(--font); font-size: 15px; line-height: 1.4; -webkit-font-smoothing: antialiased; }
 body { background: transparent; min-height: 100dvh; overscroll-behavior-y: none; }
 body.lock { overflow: hidden; }
-/* nền gradient: đen -> rust góc phải trên -> cam/peach góc trái dưới */
-body::before {
-  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
-  background:
-    radial-gradient(75% 42% at 105% 0%, rgba(168, 64, 30, 0.8) 0%, rgba(168, 64, 30, 0) 72%),
-    radial-gradient(120% 62% at 0% 112%, rgba(255, 190, 165, 0.92) 0%, rgba(255, 112, 70, 0.7) 34%, rgba(255, 97, 41, 0) 76%),
-    radial-gradient(70% 40% at 108% 80%, rgba(255, 97, 41, 0.45) 0%, rgba(255, 97, 41, 0) 72%),
-    var(--bg);
-}
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 input { font: inherit; color: inherit; }
 b { font-weight: 600; }
@@ -148,7 +139,7 @@ h1.thin.sm { font-size: 34px; margin-top: 18px; }
 .dk { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); background: rgba(255, 255, 255, 0.05); border: 1px solid var(--stroke); }
 .dk:active { transform: scale(0.93); }
 .dk.on { color: #fff; background: rgba(255, 255, 255, 0.14); border-color: var(--stroke-2); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18); }
-.dk.plus { color: #fff; border-color: rgba(255, 190, 160, 0.55); background: radial-gradient(circle at 50% 22%, #ff9f7a 0%, #ff6129 55%, #e8420c 100%); box-shadow: 0 0 26px rgba(255, 97, 41, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.45); }
+.dk.plus { position: relative; color: #fff; border-color: rgba(255, 190, 160, 0.55); background: radial-gradient(circle at 50% 22%, #ff9f7a 0%, #ff6129 55%, #e8420c 100%); box-shadow: 0 0 26px rgba(255, 97, 41, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.45); }
 .dk.plus svg.i { width: 26px; height: 26px; stroke-width: 2.2; }
 
 /* sheet */
@@ -190,4 +181,42 @@ h1.thin.sm { font-size: 34px; margin-top: 18px; }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
+}
+
+/* ---------- nền động: 3 blob radial trôi chậm (chỉ transform, chạy trên GPU) ---------- */
+.bg { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; background: var(--bg); }
+.bg i { position: absolute; display: block; border-radius: 50%; will-change: transform; }
+.bg .b1 { width: 77vmax; height: 83vmax; right: -41vmax; top: -42vmax; background: radial-gradient(closest-side, rgba(168, 64, 30, 0.8) 0%, rgba(168, 64, 30, 0) 72%); animation: drift1 24s ease-in-out infinite alternate; }
+.bg .b2 { width: 111vmax; height: 124vmax; left: -55vmax; bottom: -74vmax; background: radial-gradient(closest-side, rgba(255, 190, 165, 0.92) 0%, rgba(255, 112, 70, 0.7) 34%, rgba(255, 97, 41, 0) 76%); animation: drift2 28s ease-in-out infinite alternate; }
+.bg .b3 { width: 65vmax; height: 80vmax; right: -36vmax; bottom: -20vmax; background: radial-gradient(closest-side, rgba(255, 97, 41, 0.45) 0%, rgba(255, 97, 41, 0) 72%); animation: drift3 20s ease-in-out infinite alternate; }
+@keyframes drift1 { 0% { transform: translate3d(0, 0, 0) scale(1); } 50% { transform: translate3d(-5vmax, 4vmax, 0) scale(1.12); } 100% { transform: translate3d(2vmax, -2vmax, 0) scale(1.04); } }
+@keyframes drift2 { 0% { transform: translate3d(0, 0, 0) scale(1); } 50% { transform: translate3d(7vmax, -5vmax, 0) scale(1.1); } 100% { transform: translate3d(-2vmax, 2vmax, 0) scale(1.03); } }
+@keyframes drift3 { 0% { transform: translate3d(0, 0, 0) scale(0.95); opacity: 0.65; } 100% { transform: translate3d(-8vmax, -7vmax, 0) scale(1.12); opacity: 1; } }
+
+/* glow nút + thở */
+.dk.plus::after { content: ""; position: absolute; inset: -14px; border-radius: 50%; z-index: -1; background: radial-gradient(closest-side, rgba(255, 97, 41, 0.6), rgba(255, 97, 41, 0)); animation: breathe 3.4s ease-in-out infinite alternate; pointer-events: none; }
+@keyframes breathe { from { opacity: 0.35; transform: scale(0.9); } to { opacity: 1; transform: scale(1.15); } }
+
+/* biểu đồ: state cuối là mặc định, keyframes chỉ định state đầu (tắt animation = hiện thẳng state cuối) */
+.chart .ln { stroke-dasharray: 1; animation: draw 1.1s cubic-bezier(0.4, 0, 0.2, 1) both; }
+.chart .ar { animation: fadein 0.8s 0.45s ease both; }
+.chart .mkl, .chart .mkt { animation: fadein 0.4s 1s ease both; }
+.chart .mk { transform-box: fill-box; transform-origin: center; animation: pop 0.5s 1s cubic-bezier(0.2, 0.9, 0.3, 1.4) both; }
+.chart .pulse { transform-box: fill-box; transform-origin: center; animation: pulse 2.4s 1.5s ease-out infinite; }
+.chart .bar { transform-box: fill-box; animation: grow 0.7s var(--d, 0ms) cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.chart .bar.up { transform-origin: 50% 100%; }
+.chart .bar.dn { transform-origin: 50% 0; }
+.stack i { transform-origin: left center; animation: growx 0.8s var(--d, 0ms) cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.crow { animation: rise 0.5s var(--d, 0ms) ease both; }
+@keyframes draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes fadein { from { opacity: 0; } }
+@keyframes pop { from { opacity: 0; transform: scale(0.2); } }
+@keyframes pulse { 0% { transform: scale(1); opacity: 0.35; } 100% { transform: scale(2.4); opacity: 0; } }
+@keyframes grow { from { transform: scaleY(0); } }
+@keyframes growx { from { transform: scaleX(0); } }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } }
+
+html[data-motion="off"] *, html[data-motion="off"] *::after { animation: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::after { animation: none !important; }
 }
