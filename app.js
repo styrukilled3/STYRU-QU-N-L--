@@ -691,17 +691,59 @@
   /* ---------- sheet ---------- */
   const sheet = { editing: null, type: 'expense', cat: 'food' };
 
-  function renderSheetCats() {
-    $('#f-cats').innerHTML = CATS[sheet.type].map((c) =>
-      `<button type="button" class="cat ${c.id === sheet.cat ? 'on' : ''}" data-cat="${c.id}" style="--c:${c.color}"><span class="dot" style="background:${c.color}"></span>${esc(c.name)}</button>`).join('');
+  /* ---------- chọn ngày: chip nhanh + lịch tự vẽ (tuần bắt đầu thứ Hai, tính bằng Date nên đúng năm nhuận) ---------- */
+  const cal = { m: monthOf(todayStr()) };
+  const yesterdayStr = () => { const d = new Date(); d.setDate(d.getDate() - 1); return dstr(d); };
+  function setDate(s) {
+    $('#f-date').value = s;
+    const isT = s === todayStr(), isY = s === yesterdayStr();
+    $$('#f-dline [data-dq]').forEach((b) => b.classList.toggle('on', (b.dataset.dq === '0' && isT) || (b.dataset.dq === '1' && isY)));
+    const pick = $('#f-dpick');
+    pick.classList.toggle('on', !isT && !isY);
+    const [Y, M, D] = s.split('-').map(Number);
+    const wd = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][new Date(Y, M - 1, D).getDay()];
+    $('#f-dlabel').textContent = isT || isY ? 'Chọn ngày' : `${wd}, ${pad(D)}/${pad(M)}${Y !== new Date().getFullYear() ? '/' + Y : ''}`;
+    if ($('#cal').classList.contains('open')) renderCal();
   }
-  function syncType() {
+  function renderCal() {
+    const [Y, M] = cal.m.split('-').map(Number);
+    $('#cal-title').textContent = `Tháng ${M}, ${Y}`;
+    const first = (new Date(Y, M - 1, 1).getDay() + 6) % 7;
+    const days = new Date(Y, M, 0).getDate();
+    const sel = $('#f-date').value, today = todayStr();
+    let h = '';
+    for (let i = 0; i < first; i++) h += '<span></span>';
+    for (let d = 1; d <= days; d++) {
+      const s = `${Y}-${pad(M)}-${pad(d)}`;
+      h += `<button type="button" class="cd${s === sel ? ' on' : ''}${s === today ? ' today' : ''}" data-cday="${s}">${d}</button>`;
+    }
+    $('#cal-grid').innerHTML = h;
+  }
+  function toggleCal(open) {
+    const el = $('#cal');
+    const want = open === undefined ? !el.classList.contains('open') : open;
+    if (want) { cal.m = monthOf($('#f-date').value || todayStr()); renderCal(); }
+    el.classList.toggle('open', want);
+    $('#f-dpick').classList.toggle('open', want);
+  }
+
+  function renderSheetCats() {
+    $('#f-cats').innerHTML = CATS[sheet.type].map((c, i) =>
+      `<button type="button" class="cat ${c.id === sheet.cat ? 'on' : ''}" data-cat="${c.id}" style="--c:${c.color};--i:${i}"><span class="dot" style="background:${c.color}"></span>${esc(c.name)}</button>`).join('');
+  }
+  function syncType(first) {
     $$('#f-type button').forEach((b) => b.classList.toggle('on', b.dataset.type === sheet.type));
     const a = $('#f-amount');
     a.classList.toggle('expense', sheet.type === 'expense');
     a.classList.toggle('income', sheet.type === 'income');
     if (!CATS[sheet.type].some((c) => c.id === sheet.cat)) sheet.cat = CATS[sheet.type][0].id;
     renderSheetCats();
+    if (first === true) return;
+    // animation đổi Thu/Chi: số tiền nảy nhẹ, danh mục trượt vào lần lượt
+    const wrap = $('.amount-wrap', $('#sheet'));
+    wrap.classList.remove('flip'); void wrap.offsetWidth; wrap.classList.add('flip');
+    const cats = $('#f-cats');
+    cats.classList.remove('restage'); void cats.offsetWidth; cats.classList.add('restage');
   }
   function openSheet(t) {
     sheet.editing = t || null;
@@ -710,9 +752,10 @@
     $('#sh-title').textContent = t ? 'Sửa giao dịch' : 'Thêm giao dịch';
     $('#f-amount').value = t ? nf.format(t.amount) : '';
     $('#f-note').value = t ? t.note || '' : '';
-    $('#f-date').value = t ? t.date : todayStr();
+    toggleCal(false);
+    setDate(t ? t.date : todayStr());
     $('#f-del').hidden = !t;
-    syncType();
+    syncType(true);
     const el = $('#sheet');
     el.classList.add('open');
     el.setAttribute('aria-hidden', 'false');
@@ -972,6 +1015,7 @@
     'goto-settings': () => { state.tab = 'settings'; render(); window.scrollTo(0, 0); },
     'export-json': exportJSON,
     'export-csv': exportCSV,
+    cal: () => toggleCal(),
     'push-toggle': () => (pushOn() ? pushDisable() : pushEnable()),
     import: () => $('#f-import').click(),
     wipe: async () => {
@@ -981,7 +1025,7 @@
   };
 
   document.addEventListener('click', (e) => {
-    const el = e.target.closest('[data-cumview],[data-tipview],[data-act],[data-tab],[data-id],[data-f],[data-type],[data-add],[data-mul],[data-cat],[data-dedit],[data-dpay],[data-pid],[data-dsel],[data-dadd],[data-dmul]');
+    const el = e.target.closest('[data-cumview],[data-tipview],[data-act],[data-tab],[data-id],[data-f],[data-type],[data-add],[data-mul],[data-cat],[data-dedit],[data-dpay],[data-pid],[data-dsel],[data-dadd],[data-dmul],[data-dq],[data-cday],[data-cnav]');
     if (!el) return;
     const d = el.dataset;
     if (d.act) return ACTIONS[d.act] && ACTIONS[d.act]();
@@ -1004,6 +1048,9 @@
       }
       return;
     }
+    if (d.dq !== undefined) { const t = d.dq === '0' ? todayStr() : yesterdayStr(); setDate(t); toggleCal(false); return; }
+    if (d.cday) { setDate(d.cday); toggleCal(false); return; }
+    if (d.cnav) { cal.m = shiftMonth(cal.m, Number(d.cnav)); renderCal(); return; }
     if (d.dedit) { const x = state.debts.find((y) => y.id === d.dedit); if (x) openDSheet('debt', x); return; }
     if (d.dpay) { openDSheet('pay', null, d.dpay); return; }
     if (d.pid) { const x = state.pays.find((y) => y.id === d.pid); if (x) openDSheet('pay', x); return; }

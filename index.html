@@ -40,6 +40,21 @@
       <button type="button" data-type="expense">Chi</button>
       <button type="button" data-type="income">Thu</button>
     </div>
+    <div class="dline" id="f-dline">
+      <button type="button" class="chip" data-dq="0">Hôm nay</button>
+      <button type="button" class="chip" data-dq="1">Hôm qua</button>
+      <button type="button" class="chip dpick" id="f-dpick" data-act="cal"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M8 3v4M16 3v4"/></svg><span id="f-dlabel">Chọn ngày</span></button>
+    </div>
+    <div class="calwrap" id="cal"><div class="calin"><div class="cal">
+      <div class="calhead">
+        <button type="button" class="icon-btn" data-cnav="-1" aria-label="Tháng trước"><svg class="i" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+        <div class="caltitle" id="cal-title"></div>
+        <button type="button" class="icon-btn" data-cnav="1" aria-label="Tháng sau"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+      </div>
+      <div class="calwd"><span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span><span>T7</span><span>CN</span></div>
+      <div class="calgrid" id="cal-grid"></div>
+    </div></div></div>
+    <input id="f-date" type="hidden">
     <div class="amount-wrap">
       <input id="f-amount" class="amount num expense" inputmode="numeric" autocomplete="off" placeholder="0" aria-label="Số tiền">
       <span class="cur">₫</span>
@@ -53,10 +68,7 @@
       <button type="button" class="chip" data-add="1000000">+1tr</button>
     </div>
     <div class="cats" id="f-cats"></div>
-    <div class="row2">
-      <input id="f-note" class="field" placeholder="Ghi chú" autocomplete="off" aria-label="Ghi chú">
-      <input id="f-date" class="field" type="date" aria-label="Ngày" style="width:150px">
-    </div>
+    <input id="f-note" class="field" placeholder="Ghi chú" autocomplete="off" aria-label="Ghi chú">
     <button class="btn primary" data-act="save">Lưu</button>
     <button class="btn ghost" id="f-del" data-act="delete" hidden>Xoá giao dịch</button>
   </div>
