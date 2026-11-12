@@ -433,3 +433,24 @@ html[data-motion="off"] .amount-wrap.flip .amount, html[data-motion="off"] .cats
 
 /* khi form mở: dừng nền động để GPU dành cho animation của form */
 body.lock .bg i { animation-play-state: paused; }
+
+/* sheet chi tiết Thu/Chi */
+.tile.tap { cursor: pointer; position: relative; }
+.tile .label { display: flex; align-items: center; justify-content: space-between; }
+.tile .chev { width: 16px; height: 16px; opacity: 0.45; }
+.t-total { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 14px; }
+.t-total .num { font-size: 36px; font-weight: 500; letter-spacing: -0.04em; }
+.t-total .num.out { color: var(--out); }
+.t-total .s, .tg-head .s { color: var(--muted); font-size: 13px; }
+.tg { border-top: 1px solid var(--stroke); animation: rise 0.4s cubic-bezier(0.3, 1, 0.5, 1) backwards; animation-delay: var(--d, 0ms); }
+.tg-head { width: 100%; display: grid; grid-template-columns: 10px 1fr auto 18px; gap: 12px; align-items: center; text-align: left; min-height: 60px; padding: 8px 0; }
+.tg-head .mid { display: flex; flex-direction: column; min-width: 0; }
+.tg-head .t { font-weight: 500; }
+.tg-head .a { font-weight: 600; }
+.chev2 { width: 16px; height: 16px; opacity: 0.5; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+.tg.open .chev2 { transform: rotate(90deg); }
+.tg-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.36s cubic-bezier(0.4, 0, 0.2, 1); }
+.tg.open .tg-body { grid-template-rows: 1fr; }
+.tg-in { overflow: hidden; min-height: 0; }
+.tg-in .items { margin-bottom: 10px; }
+html[data-motion="off"] .tg, html[data-motion="off"] .tg-body, html[data-motion="off"] .chev2 { animation: none; transition: none; }

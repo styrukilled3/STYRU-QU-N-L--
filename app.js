@@ -381,8 +381,8 @@
         <div class="bigrow">${dm((neg ? '-' : '') + nf.format(Math.abs(s.net)), 8, neg, 'hero', s.net)}<span class="unit">₫</span></div>
       </section>
       <div class="tiles">
-        <div class="tile glass in"><div class="label">Thu</div><i class="tick"></i><div class="bigrow">${tIn.svg}<span class="unit">${tIn.unit}</span></div><div class="sub">${nIn} khoản</div></div>
-        <div class="tile glass out"><div class="label">Chi</div><i class="tick"></i><div class="bigrow">${tOut.svg}<span class="unit">${tOut.unit}</span></div><div class="sub">${nOut} khoản</div></div>
+        <div class="tile glass in tap" role="button" tabindex="0" data-tile="income"><div class="label">Thu<svg class="i chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div><i class="tick"></i><div class="bigrow">${tIn.svg}<span class="unit">${tIn.unit}</span></div><div class="sub">${nIn} khoản</div></div>
+        <div class="tile glass out tap" role="button" tabindex="0" data-tile="expense"><div class="label">Chi<svg class="i chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div><i class="tick"></i><div class="bigrow">${tOut.svg}<span class="unit">${tOut.unit}</span></div><div class="sub">${nOut} khoản</div></div>
       </div>
       ${todayNotice()}${backupNotice()}
       ${cumCard()}
@@ -628,6 +628,7 @@
     el.classList.remove('swapin'); void el.offsetWidth; el.classList.add('swapin');
   }
   function render() {
+    if ($('#tsheet').classList.contains('open')) fillT();
     const app = $('#app');
     const tabChanged = lastTab !== null && lastTab !== state.tab;
     const stagger = motionOn() && !tabChanged && (lastTab === null || lastMonth !== state.month);
@@ -774,7 +775,7 @@
     const el = $('#sheet');
     el.classList.remove('open');
     el.setAttribute('aria-hidden', 'true');
-    document.body.classList.remove('lock');
+    unlockIfNone();
     if (document.activeElement) document.activeElement.blur();
   }
 
@@ -804,6 +805,51 @@
     closeSheet();
     render();
     toast('Đã xoá', 'Hoàn tác', async () => { await dbPut(t); state.txs.push(t); render(); });
+  }
+
+  const unlockIfNone = () => { if (!$('.overlay.open')) document.body.classList.remove('lock'); };
+
+  /* ---------- sheet chi tiết Thu / Chi của tháng ---------- */
+  const tsheet = { type: 'expense', open: new Set(), init: false };
+  function fillT() {
+    const type = tsheet.type, isIn = type === 'income';
+    const list = monthTxs().filter((t) => t.type === type);
+    $('#t-title').textContent = `${isIn ? 'Thu' : 'Chi'} ${monthLabel(state.month).toLowerCase()}`;
+    if (!list.length) { $('#t-body').innerHTML = `<div class="empty-sm" style="padding:28px 0">Chưa có khoản ${isIn ? 'thu' : 'chi'} trong tháng này</div>`; return; }
+    const total = list.reduce((x, t) => x + t.amount, 0);
+    const by = new Map();
+    for (const t of list) { if (!by.has(t.cat)) by.set(t.cat, []); by.get(t.cat).push(t); }
+    const rows = [...by.entries()].map(([id, ts]) => [id, ts, ts.reduce((x, t) => x + t.amount, 0)]).sort((a, b) => b[2] - a[2]);
+    if (!tsheet.init) { tsheet.open = new Set([rows[0][0]]); tsheet.init = true; }
+    const stack = rows.map(([id, , v], k) => `<i style="width:${(v / total) * 100}%;background:${catOf(id).color};--d:${k * 70}ms"></i>`).join('');
+    const groups = rows.map(([id, ts, v], k) => {
+      const c = catOf(id), on = tsheet.open.has(id);
+      ts.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
+      const items = ts.map((t) => `<button class="item" data-id="${esc(t.id)}"><span class="dot" style="background:${c.color}"></span><span class="mid"><span class="t">${esc(t.note || c.name)}</span><span class="s">${dateLabel(t.date)}</span></span><span class="a num ${isIn ? 'in' : 'out'}">${isIn ? '+' : '-'}${money(t.amount)}</span></button>`).join('');
+      return `<div class="tg${on ? ' open' : ''}" style="--d:${120 + k * 50}ms">
+        <button class="tg-head" data-tg="${esc(id)}" aria-expanded="${on}">
+          <span class="dot" style="background:${c.color}"></span>
+          <span class="mid"><span class="t">${esc(c.name)}</span><span class="s">${ts.length} khoản · ${Math.round((v / total) * 100)}%</span></span>
+          <span class="a num">${money(v)}</span>
+          <svg class="i chev2" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+        <div class="tg-body"><div class="tg-in"><div class="items glass">${items}</div></div></div>
+      </div>`;
+    }).join('');
+    $('#t-body').innerHTML = `<div class="t-total"><span class="num ${isIn ? 'in' : 'out'}">${money(total)}</span><span class="s">${list.length} khoản · ${rows.length} danh mục</span></div><div class="stack">${stack}</div>${groups}`;
+  }
+  function openTSheet(type) {
+    tsheet.type = type; tsheet.init = false;
+    fillT();
+    const el = $('#tsheet');
+    el.classList.add('open'); el.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('lock');
+    $('.panel', el).scrollTop = 0;
+  }
+  function closeTSheet() {
+    const el = $('#tsheet');
+    el.classList.remove('open'); el.setAttribute('aria-hidden', 'true');
+    unlockIfNone();
   }
 
   /* ---------- sheet nợ ---------- */
@@ -845,7 +891,7 @@
   function closeDSheet() {
     const el = $('#dsheet');
     el.classList.remove('open'); el.setAttribute('aria-hidden', 'true');
-    if (!$('#sheet').classList.contains('open')) document.body.classList.remove('lock');
+    unlockIfNone();
     if (document.activeElement) document.activeElement.blur();
   }
   async function saveD() {
@@ -992,6 +1038,7 @@
     prev: () => { state.month = shiftMonth(state.month, -1); render(); },
     next: () => { state.month = shiftMonth(state.month, 1); render(); },
     add: () => (state.tab === 'debt' ? (state.debts.length ? openDSheet('pay') : openDSheet('debt')) : openSheet()),
+    tclose: closeTSheet,
     'debt-new': () => openDSheet('debt'),
     'lock-toggle': () => (getLock()
       ? openLock('verify', { cancel: true, onOk: () => { try { localStorage.removeItem(LOCK_KEY); localStorage.removeItem(FACE_KEY); } catch { /* ignore */ } render(); toast('Đã tắt khóa'); } })
@@ -1034,7 +1081,7 @@
   };
 
   document.addEventListener('click', (e) => {
-    const el = e.target.closest('[data-cumview],[data-tipview],[data-act],[data-tab],[data-id],[data-f],[data-type],[data-add],[data-mul],[data-cat],[data-dedit],[data-dpay],[data-pid],[data-dsel],[data-dadd],[data-dmul],[data-dq],[data-cday],[data-cnav],[data-ctoggle]');
+    const el = e.target.closest('[data-cumview],[data-tipview],[data-act],[data-tab],[data-id],[data-f],[data-type],[data-add],[data-mul],[data-cat],[data-dedit],[data-dpay],[data-pid],[data-dsel],[data-dadd],[data-dmul],[data-dq],[data-cday],[data-cnav],[data-ctoggle],[data-tile],[data-tg]');
     if (!el) return;
     const d = el.dataset;
     if (d.act) return ACTIONS[d.act] && ACTIONS[d.act]();
@@ -1057,6 +1104,8 @@
       }
       return;
     }
+    if (d.tile) { openTSheet(d.tile); return; }
+    if (d.tg) { const g = el.closest('.tg'); const on = g.classList.toggle('open'); el.setAttribute('aria-expanded', on); if (on) tsheet.open.add(d.tg); else tsheet.open.delete(d.tg); return; }
     if (d.ctoggle || d.dq !== undefined || d.cday || d.cnav) {
       const p = el.closest('[data-dk]').dataset.dk;
       if (d.ctoggle) toggleCal(p);
@@ -1095,7 +1144,7 @@
       renderListBody();
     }
   });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSheet(); closeDSheet(); } });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSheet(); closeDSheet(); closeTSheet(); } });
 
   /* ---------- vuốt ngang: 2 trang dính nhau trượt cùng ngón tay (Tổng quan > Nợ > Giao dịch) ---------- */
   const TAB_ORDER = ['home', 'debt', 'list'];
@@ -1410,7 +1459,7 @@
     else if (face) { if (document.documentElement.classList.contains('intro')) document.addEventListener('intro-done', tryFace, { once: true }); else tryFace(); }
   }
   function lockNow() {
-    closeSheet(); closeDSheet();
+    closeSheet(); closeDSheet(); closeTSheet();
     document.documentElement.classList.add('locked');
     openLock('verify', { boot: true, onOk: () => { shown.clear(); render(); replayEnter(); } });
   }
