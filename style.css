@@ -454,3 +454,16 @@ body.lock .bg i { animation-play-state: paused; }
 .tg-in { overflow: hidden; min-height: 0; }
 .tg-in .items { margin-bottom: 10px; }
 html[data-motion="off"] .tg, html[data-motion="off"] .tg-body, html[data-motion="off"] .chev2 { animation: none; transition: none; }
+
+/* card dự báo cuối tháng */
+.fc .bigrow { margin-top: 2px; }
+.fc-bar { height: 10px; border-radius: 5px; background: rgba(255, 255, 255, 0.08); margin: 16px 0 10px; overflow: hidden; }
+.fc-bar i { display: block; height: 100%; border-radius: 5px; background: linear-gradient(90deg, #ff4d12, #ffd0bb); transform-origin: left; animation: growx 0.9s cubic-bezier(0.3, 0.8, 0.3, 1) 0.15s backwards; }
+.fc-sub { color: var(--muted); font-size: 13px; }
+.fc-list { margin-top: 14px; border-top: 1px solid var(--stroke); }
+.fc-ins { display: grid; grid-template-columns: 18px 1fr; gap: 10px; align-items: start; padding: 11px 0; border-bottom: 1px solid var(--stroke); font-size: 14px; line-height: 1.35; }
+.fc-ins:last-child { border-bottom: 0; padding-bottom: 0; }
+.fc-ins .i { width: 16px; height: 16px; margin-top: 1px; opacity: 0.7; }
+.fc-ins.bad .i { color: var(--orange); opacity: 1; }
+.fc-note { margin-top: 12px; color: var(--faint); font-size: 12px; line-height: 1.4; }
+html[data-motion="off"] .fc-bar i { animation: none; }

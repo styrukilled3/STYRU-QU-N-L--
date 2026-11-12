@@ -365,6 +365,81 @@
     return `<div class="stack">${stack}</div><div>${rws}</div>`;
   }
 
+  /* ---------- Cuối tháng dự kiến + nhận xét ---------- */
+  function forecastCard() {
+    const cur = monthOf(todayStr());
+    if (state.month > cur) return '';
+    const list = monthTxs();
+    if (!list.length) return '';
+    const isCur = state.month === cur;
+    const { dim, elapsed } = monthInfo();
+    const upto = isCur ? elapsed : dim;
+    const s = sums(list);
+    const exps = list.filter((t) => t.type === 'expense');
+    const head = (title, tag) => `<h2><span>${title}</span>${tag || ''}</h2>`;
+    if (isCur && (elapsed < 7 || list.length < 5)) {
+      return `<section class="card glass fc">${head('Cuối tháng dự kiến')}<div class="empty-sm">Cần thêm vài ngày dữ liệu để dự báo cho đúng</div></section>`;
+    }
+    const spent = s.e;
+    let projExp = spent, avg = 0, left = 0;
+    if (isCur) {
+      const big = exps.length >= 3 ? Math.max(...exps.map((t) => t.amount)) : 0;
+      avg = (spent - big) / elapsed;
+      left = dim - elapsed;
+      projExp = spent + avg * left;
+    }
+    const projNet = s.i - projExp;
+    const neg = projNet < 0;
+    const k = Math.abs(projNet) >= 1000, n = Math.round(k ? Math.abs(projNet) / 1000 : Math.abs(projNet));
+    const big = dm((neg ? '-' : '') + nf.format(n), 4.4, neg, 'proj', neg ? -n : n);
+    const tag = `<span class="tag"><i class="dot ${neg ? 'out' : 'in'}"></i>${neg ? 'Thâm hụt' : 'Thặng dư'}</span>`;
+    const base = isCur ? projExp : Math.max(s.i, s.e);
+    const pct = base > 0 ? Math.min(100, (spent / base) * 100) : 0;
+    const sub = isCur
+      ? `Còn ${left} ngày · chi TB ${compact(Math.round(avg))}/ngày`
+      : `Chi ${compact(s.e)} trên thu ${compact(s.i)}`;
+
+    // nhận xét
+    const ins = [];
+    const up = '<svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg>';
+    const dn = '<svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></svg>';
+    const mk = (dir, text, bad) => `<div class="fc-ins${bad ? ' bad' : ''}">${dir === 'up' ? up : dn}<span>${text}</span></div>`;
+    const prevMs = [1, 2, 3].map((d) => shiftMonth(state.month, -d)).filter((m) => state.txs.some((t) => t.date.startsWith(m)));
+    if (prevMs.length) {
+      const catSum = (ts) => { const m = {}; for (const t of ts) if (t.type === 'expense') m[t.cat] = (m[t.cat] || 0) + t.amount; return m; };
+      const now = catSum(list.filter((t) => +t.date.slice(8, 10) <= upto));
+      const hist = {};
+      for (const m of prevMs) for (const [c, v] of Object.entries(catSum(state.txs.filter((t) => t.date.startsWith(m) && +t.date.slice(8, 10) <= upto)))) hist[c] = (hist[c] || 0) + v / prevMs.length;
+      let best = null;
+      for (const c of new Set([...Object.keys(now), ...Object.keys(hist)])) {
+        const x = now[c] || 0, y = hist[c] || 0;
+        if (y <= 0 || Math.abs(x - y) < 50000) continue;
+        const r = (x - y) / y;
+        if (Math.abs(r) < 0.2) continue;
+        if (!best || Math.abs(x - y) > Math.abs(best.d)) best = { c, d: x - y, r };
+      }
+      if (best) ins.push(mk(best.d > 0 ? 'up' : 'dn', `${esc(catOf(best.c).name)} ${best.d > 0 ? 'cao' : 'thấp'} hơn ${Math.round(Math.abs(best.r) * 100)}% so với trung bình ${prevMs.length} tháng cùng kỳ`, best.d > 0));
+    }
+    if (exps.length) {
+      const byDay = {};
+      for (const t of exps) byDay[t.date] = (byDay[t.date] || 0) + t.amount;
+      const [d, v] = Object.entries(byDay).sort((x, y) => y[1] - x[1])[0];
+      ins.push(mk('up', `Ngày chi nhiều nhất: ${dateLabel(d)} (${compact(v)})`, false));
+    }
+    const pm = shiftMonth(state.month, -1);
+    const ps = sums(state.txs.filter((t) => t.date.startsWith(pm)));
+    if (s.i > 0 && ps.i > 0) {
+      const r1 = Math.round((s.net / s.i) * 100), r0 = Math.round((ps.net / ps.i) * 100);
+      if (r1 !== r0) ins.push(mk(r1 > r0 ? 'up' : 'dn', `Tiết kiệm ${r1}% thu, tháng trước ${r0}%`, r1 < r0));
+    }
+    return `<section class="card glass fc">${head(isCur ? 'Cuối tháng dự kiến' : 'Tổng kết tháng', tag)}
+      <div class="bigrow">${big}<span class="unit">${k ? 'nghìn ₫' : '₫'}</span></div>
+      <div class="fc-bar"><i style="width:${pct.toFixed(1)}%"></i></div>
+      <div class="fc-sub">${sub}</div>
+      ${ins.length ? `<div class="fc-list">${ins.slice(0, 3).join('')}</div>` : ''}
+      ${isCur ? '<div class="fc-note">Ước lượng tuyến tính, bỏ khoản chi lớn nhất khi tính trung bình. Thu giữ nguyên số đã có.</div>' : ''}</section>`;
+  }
+
   function viewHome() {
     const list = monthTxs(), s = sums(list);
     const { elapsed } = monthInfo();
@@ -386,6 +461,7 @@
       </div>
       ${todayNotice()}${backupNotice()}
       ${cumCard()}
+      ${forecastCard()}
       <div class="tiles">
         <div class="tile glass"><div class="label">Chi TB mỗi ngày</div><i class="tick"></i><div class="bigrow">${avg.svg}<span class="unit">${avg.unit}</span></div><div class="sub">${elapsed} ngày tính</div></div>
         <div class="tile glass"><div class="label">Tiết kiệm</div><i class="tick"></i><div class="bigrow">${rate === null ? dm('-', 4.4, false) : dm(rate + '%', 4.4, rate < 0, 'rate', rate, '%')}</div><div class="sub">${rate === null ? 'Chưa có thu' : 'trên tổng thu'}</div></div>
