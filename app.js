@@ -381,8 +381,8 @@
         <div class="bigrow">${dm((neg ? '-' : '') + nf.format(Math.abs(s.net)), 8, neg, 'hero', s.net)}<span class="unit">₫</span></div>
       </section>
       <div class="tiles">
-        <div class="tile glass in tap" role="button" tabindex="0" data-tile="income"><div class="label">Thu<svg class="i chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div><i class="tick"></i><div class="bigrow">${tIn.svg}<span class="unit">${tIn.unit}</span></div><div class="sub">${nIn} khoản</div></div>
-        <div class="tile glass out tap" role="button" tabindex="0" data-tile="expense"><div class="label">Chi<svg class="i chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div><i class="tick"></i><div class="bigrow">${tOut.svg}<span class="unit">${tOut.unit}</span></div><div class="sub">${nOut} khoản</div></div>
+        <div class="tile glass in tap" role="button" tabindex="0" data-tile="income"><div class="label">Thu</div><i class="tick"></i><div class="bigrow">${tIn.svg}<span class="unit">${tIn.unit}</span></div><div class="sub">${nIn} khoản</div></div>
+        <div class="tile glass out tap" role="button" tabindex="0" data-tile="expense"><div class="label">Chi</div><i class="tick"></i><div class="bigrow">${tOut.svg}<span class="unit">${tOut.unit}</span></div><div class="sub">${nOut} khoản</div></div>
       </div>
       ${todayNotice()}${backupNotice()}
       ${cumCard()}
