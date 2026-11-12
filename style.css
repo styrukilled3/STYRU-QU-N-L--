@@ -429,3 +429,4 @@ html.intro #lock { opacity: 0 !important; transition: none !important; }
 @keyframes catin { from { opacity: 0; transform: translateY(8px) scale(0.94); } }
 html[data-motion="off"] .seg.type::before, html[data-motion="off"] .calwrap, html[data-motion="off"] .cal { transition: none; }
 html[data-motion="off"] .amount-wrap.flip .amount, html[data-motion="off"] .cats.restage .cat, html[data-motion="off"] .cd.on { animation: none; }
+.dk-wrap { margin: 2px 0 8px; }

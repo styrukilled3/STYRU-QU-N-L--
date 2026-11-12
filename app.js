@@ -692,39 +692,38 @@
   const sheet = { editing: null, type: 'expense', cat: 'food' };
 
   /* ---------- chọn ngày: chip nhanh + lịch tự vẽ (tuần bắt đầu thứ Hai, tính bằng Date nên đúng năm nhuận) ---------- */
-  const cal = { m: monthOf(todayStr()) };
+  const cal = { f: monthOf(todayStr()), d: monthOf(todayStr()) };
   const yesterdayStr = () => { const d = new Date(); d.setDate(d.getDate() - 1); return dstr(d); };
-  function setDate(s) {
-    $('#f-date').value = s;
+  function setDate(p, s) {
+    $(`#${p}-date`).value = s;
     const isT = s === todayStr(), isY = s === yesterdayStr();
-    $$('#f-dline [data-dq]').forEach((b) => b.classList.toggle('on', (b.dataset.dq === '0' && isT) || (b.dataset.dq === '1' && isY)));
-    const pick = $('#f-dpick');
-    pick.classList.toggle('on', !isT && !isY);
+    $$(`#${p}-dline [data-dq]`).forEach((b) => b.classList.toggle('on', (b.dataset.dq === '0' && isT) || (b.dataset.dq === '1' && isY)));
+    $(`#${p}-dpick`).classList.toggle('on', !isT && !isY);
     const [Y, M, D] = s.split('-').map(Number);
     const wd = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][new Date(Y, M - 1, D).getDay()];
-    $('#f-dlabel').textContent = isT || isY ? 'Chọn ngày' : `${wd}, ${pad(D)}/${pad(M)}${Y !== new Date().getFullYear() ? '/' + Y : ''}`;
-    if ($('#cal').classList.contains('open')) renderCal();
+    $(`#${p}-dlabel`).textContent = isT || isY ? 'Chọn ngày' : `${wd}, ${pad(D)}/${pad(M)}${Y !== new Date().getFullYear() ? '/' + Y : ''}`;
+    if ($(`#${p}-cal`).classList.contains('open')) renderCal(p);
   }
-  function renderCal() {
-    const [Y, M] = cal.m.split('-').map(Number);
-    $('#cal-title').textContent = `Tháng ${M}, ${Y}`;
+  function renderCal(p) {
+    const [Y, M] = cal[p].split('-').map(Number);
+    $(`#${p}-cal-title`).textContent = `Tháng ${M}, ${Y}`;
     const first = (new Date(Y, M - 1, 1).getDay() + 6) % 7;
     const days = new Date(Y, M, 0).getDate();
-    const sel = $('#f-date').value, today = todayStr();
+    const sel = $(`#${p}-date`).value, today = todayStr();
     let h = '';
     for (let i = 0; i < first; i++) h += '<span></span>';
     for (let d = 1; d <= days; d++) {
       const s = `${Y}-${pad(M)}-${pad(d)}`;
       h += `<button type="button" class="cd${s === sel ? ' on' : ''}${s === today ? ' today' : ''}" data-cday="${s}">${d}</button>`;
     }
-    $('#cal-grid').innerHTML = h;
+    $(`#${p}-cal-grid`).innerHTML = h;
   }
-  function toggleCal(open) {
-    const el = $('#cal');
+  function toggleCal(p, open) {
+    const el = $(`#${p}-cal`);
     const want = open === undefined ? !el.classList.contains('open') : open;
-    if (want) { cal.m = monthOf($('#f-date').value || todayStr()); renderCal(); }
+    if (want) { cal[p] = monthOf($(`#${p}-date`).value || todayStr()); renderCal(p); }
     el.classList.toggle('open', want);
-    $('#f-dpick').classList.toggle('open', want);
+    $(`#${p}-dpick`).classList.toggle('open', want);
   }
 
   function renderSheetCats() {
@@ -752,8 +751,8 @@
     $('#sh-title').textContent = t ? 'Sửa giao dịch' : 'Thêm giao dịch';
     $('#f-amount').value = t ? nf.format(t.amount) : '';
     $('#f-note').value = t ? t.note || '' : '';
-    toggleCal(false);
-    setDate(t ? t.date : todayStr());
+    toggleCal('f', false);
+    setDate('f', t ? t.date : todayStr());
     $('#f-del').hidden = !t;
     syncType(true);
     const el = $('#sheet');
@@ -819,7 +818,9 @@
     $('#d-amount').value = rec ? nf.format(isPay ? rec.amount : rec.total) : '';
     $('#d-name').value = !isPay && rec ? rec.name : '';
     $('#d-note').value = isPay && rec ? rec.note || '' : '';
-    $('#d-date').value = isPay && rec ? rec.date : todayStr();
+    $('#d-dk').style.display = isPay ? '' : 'none';
+    toggleCal('d', false);
+    setDate('d', isPay && rec ? rec.date : todayStr());
     $('#d-del').hidden = !rec;
     $('#d-del').textContent = isPay ? 'Xoá khoản trả' : 'Xoá khoản nợ';
     if (isPay) {
@@ -1015,7 +1016,6 @@
     'goto-settings': () => { state.tab = 'settings'; render(); window.scrollTo(0, 0); },
     'export-json': exportJSON,
     'export-csv': exportCSV,
-    cal: () => toggleCal(),
     'push-toggle': () => (pushOn() ? pushDisable() : pushEnable()),
     import: () => $('#f-import').click(),
     wipe: async () => {
@@ -1025,7 +1025,7 @@
   };
 
   document.addEventListener('click', (e) => {
-    const el = e.target.closest('[data-cumview],[data-tipview],[data-act],[data-tab],[data-id],[data-f],[data-type],[data-add],[data-mul],[data-cat],[data-dedit],[data-dpay],[data-pid],[data-dsel],[data-dadd],[data-dmul],[data-dq],[data-cday],[data-cnav]');
+    const el = e.target.closest('[data-cumview],[data-tipview],[data-act],[data-tab],[data-id],[data-f],[data-type],[data-add],[data-mul],[data-cat],[data-dedit],[data-dpay],[data-pid],[data-dsel],[data-dadd],[data-dmul],[data-dq],[data-cday],[data-cnav],[data-ctoggle]');
     if (!el) return;
     const d = el.dataset;
     if (d.act) return ACTIONS[d.act] && ACTIONS[d.act]();
@@ -1048,9 +1048,14 @@
       }
       return;
     }
-    if (d.dq !== undefined) { const t = d.dq === '0' ? todayStr() : yesterdayStr(); setDate(t); toggleCal(false); return; }
-    if (d.cday) { setDate(d.cday); toggleCal(false); return; }
-    if (d.cnav) { cal.m = shiftMonth(cal.m, Number(d.cnav)); renderCal(); return; }
+    if (d.ctoggle || d.dq !== undefined || d.cday || d.cnav) {
+      const p = el.closest('[data-dk]').dataset.dk;
+      if (d.ctoggle) toggleCal(p);
+      else if (d.dq !== undefined) { setDate(p, d.dq === '0' ? todayStr() : yesterdayStr()); toggleCal(p, false); }
+      else if (d.cday) { setDate(p, d.cday); toggleCal(p, false); }
+      else { cal[p] = shiftMonth(cal[p], Number(d.cnav)); renderCal(p); }
+      return;
+    }
     if (d.dedit) { const x = state.debts.find((y) => y.id === d.dedit); if (x) openDSheet('debt', x); return; }
     if (d.dpay) { openDSheet('pay', null, d.dpay); return; }
     if (d.pid) { const x = state.pays.find((y) => y.id === d.pid); if (x) openDSheet('pay', x); return; }
