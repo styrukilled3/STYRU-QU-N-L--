@@ -744,6 +744,15 @@
     const cats = $('#f-cats');
     cats.classList.remove('restage'); void cats.offsetWidth; cats.classList.add('restage');
   }
+  // focus sau khi panel trượt xong: bàn phím iOS bật giữa lúc đang trượt sẽ làm giật
+  function focusAfterSlide(overlay, input) {
+    const panel = overlay.querySelector('.panel');
+    let done = false;
+    const go = () => { if (done) return; done = true; panel.removeEventListener('transitionend', onEnd); if (overlay.classList.contains('open')) input.focus(); };
+    const onEnd = (e) => { if (e.target === panel && e.propertyName === 'transform') go(); };
+    panel.addEventListener('transitionend', onEnd);
+    setTimeout(go, 520);
+  }
   function openSheet(t) {
     sheet.editing = t || null;
     sheet.type = t ? t.type : 'expense';
@@ -759,7 +768,7 @@
     el.classList.add('open');
     el.setAttribute('aria-hidden', 'false');
     document.body.classList.add('lock');
-    if (!t) setTimeout(() => $('#f-amount').focus(), 60);
+    if (!t) focusAfterSlide(el, $('#f-amount'));
   }
   function closeSheet() {
     const el = $('#sheet');
@@ -831,7 +840,7 @@
     const el = $('#dsheet');
     el.classList.add('open'); el.setAttribute('aria-hidden', 'false');
     document.body.classList.add('lock');
-    if (!rec) setTimeout(() => (isPay ? $('#d-amount') : $('#d-name')).focus(), 60);
+    if (!rec) focusAfterSlide(el, isPay ? $('#d-amount') : $('#d-name'));
   }
   function closeDSheet() {
     const el = $('#dsheet');

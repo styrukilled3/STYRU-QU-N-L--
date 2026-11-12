@@ -160,7 +160,7 @@ h1.thin.sm { font-size: 34px; margin-top: 18px; }
 /* sheet */
 .overlay { position: fixed; inset: 0; z-index: 30; visibility: hidden; }
 .overlay .bd { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.6); opacity: 0; transition: opacity 0.35s ease-in-out; }
-.overlay .panel { position: absolute; left: 0; right: 0; bottom: 0; max-width: 560px; margin: 0 auto; background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 40%), rgba(22, 15, 12, 0.9); -webkit-backdrop-filter: blur(30px) saturate(150%); backdrop-filter: blur(30px) saturate(150%); border: 1px solid var(--stroke-2); border-bottom: 0; border-radius: 28px 28px 0 0; padding: 12px 18px calc(var(--safe-b) + 18px); max-height: 94dvh; overflow-y: auto; transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.5, 0, 0.2, 1); }
+.overlay .panel { will-change: transform; position: absolute; left: 0; right: 0; bottom: 0; max-width: 560px; margin: 0 auto; background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 40%), rgba(22, 15, 12, 0.9); -webkit-backdrop-filter: blur(18px) saturate(150%); backdrop-filter: blur(18px) saturate(150%); border: 1px solid var(--stroke-2); border-bottom: 0; border-radius: 28px 28px 0 0; padding: 12px 18px calc(var(--safe-b) + 18px); max-height: 94dvh; overflow-y: auto; transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.5, 0, 0.2, 1); }
 .overlay.open { visibility: visible; }
 .overlay.open .bd { opacity: 1; }
 .overlay.open .panel { transform: none; }
@@ -430,3 +430,6 @@ html.intro #lock { opacity: 0 !important; transition: none !important; }
 html[data-motion="off"] .seg.type::before, html[data-motion="off"] .calwrap, html[data-motion="off"] .cal { transition: none; }
 html[data-motion="off"] .amount-wrap.flip .amount, html[data-motion="off"] .cats.restage .cat, html[data-motion="off"] .cd.on { animation: none; }
 .dk-wrap { margin: 2px 0 8px; }
+
+/* khi form mở: dừng nền động để GPU dành cho animation của form */
+body.lock .bg i { animation-play-state: paused; }
