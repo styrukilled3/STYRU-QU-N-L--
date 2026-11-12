@@ -821,9 +821,13 @@
     for (const t of list) { if (!by.has(t.cat)) by.set(t.cat, []); by.get(t.cat).push(t); }
     const rows = [...by.entries()].map(([id, ts]) => [id, ts, ts.reduce((x, t) => x + t.amount, 0)]).sort((a, b) => b[2] - a[2]);
     if (!tsheet.init) { tsheet.open = new Set([rows[0][0]]); tsheet.init = true; }
-    const stack = rows.map(([id, , v], k) => `<i style="width:${(v / total) * 100}%;background:${catOf(id).color};--d:${k * 70}ms"></i>`).join('');
+    // thanh tỉ trọng: một dải gradient liền từ đậm (#ff4d12) tới nhạt (#ffd0bb), mỗi danh mục chiếm đoạn của nó
+    const lerp = (t) => { const A = [255, 77, 18], B = [255, 208, 187]; return 'rgb(' + A.map((x, i) => Math.round(x + (B[i] - x) * t)).join(',') + ')'; };
+    let acc = 0;
+    const seg = rows.map(([, , v]) => { const s = acc / total; acc += v; return { a: lerp(s), b: lerp(acc / total), m: lerp((s + acc / total) / 2) }; });
+    const stack = rows.map(([, , v], k) => `<i style="width:${(v / total) * 100}%;background:linear-gradient(90deg,${seg[k].a},${seg[k].b});--d:${k * 70}ms"></i>`).join('');
     const groups = rows.map(([id, ts, v], k) => {
-      const c = catOf(id), on = tsheet.open.has(id);
+      const c = { ...catOf(id), color: seg[k].m }, on = tsheet.open.has(id);
       ts.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
       const items = ts.map((t) => `<button class="item" data-id="${esc(t.id)}"><span class="dot" style="background:${c.color}"></span><span class="mid"><span class="t">${esc(t.note || c.name)}</span><span class="s">${dateLabel(t.date)}</span></span><span class="a num ${isIn ? 'in' : 'out'}">${isIn ? '+' : '-'}${money(t.amount)}</span></button>`).join('');
       return `<div class="tg${on ? ' open' : ''}" style="--d:${120 + k * 50}ms">
