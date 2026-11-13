@@ -46,6 +46,7 @@
     income: [
       { id: 'salary', name: 'Lương', color: '#ffffff' },
       { id: 'tip', name: 'Tip', color: '#ffc9b0' },
+      { id: 'revenue', name: 'Doanh thu', color: '#ffe0d2' },
       { id: 'freelance', name: 'Freelance', color: '#f2d5c7' },
       { id: 'bonus', name: 'Thưởng', color: '#cdb6ab' },
       { id: 'inc_other', name: 'Khác', color: '#8a7b74' },
