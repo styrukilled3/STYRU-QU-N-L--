@@ -40,6 +40,21 @@
   </div>
 </div>
 
+<div class="overlay" id="ksheet" aria-hidden="true">
+  <div class="bd" data-act="kclose"></div>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="k-title">
+    <div class="grab"></div>
+    <div class="sh-head">
+      <h3 id="k-title">Nguồn thu theo dõi</h3>
+      <button class="icon-btn" data-act="kclose" aria-label="Đóng"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <input id="k-name" class="field" maxlength="24" placeholder="Tên hiển thị" autocomplete="off" aria-label="Tên hiển thị">
+    <div class="k-lab">Tính các nguồn thu</div>
+    <div class="k-cats" id="k-cats"></div>
+    <button class="btn primary" data-act="ksave">Lưu</button>
+  </div>
+</div>
+
 <div class="overlay" id="sheet" aria-hidden="true">
   <div class="bd" data-act="close"></div>
   <div class="panel" role="dialog" aria-modal="true" aria-labelledby="sh-title">

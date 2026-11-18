@@ -513,7 +513,15 @@
   /* ---------- tip ---------- */
   const TIPVIEW_KEY = 'dong-tien:tipview';
   const tipView = () => { try { return localStorage.getItem(TIPVIEW_KEY) === 'compare' ? 'compare' : 'chart'; } catch { return 'chart'; } };
-  const tipByMonth = (ms) => ms.map((m) => state.txs.filter((t) => t.type === 'income' && t.cat === 'tip' && t.date.startsWith(m)).reduce((a, t) => a + t.amount, 0));
+  // cấu hình tracker: tên hiển thị + các danh mục thu được tính (mặc định Tip)
+  const TRK_KEY = 'dong-tien:tracker';
+  const normTrk = (t) => {
+    if (!t || typeof t.name !== 'string' || !Array.isArray(t.cats)) return null;
+    const cats = CATS.income.map((c) => c.id).filter((id) => t.cats.includes(id)), name = t.name.trim().slice(0, 24);
+    return name && cats.length ? { name, cats } : null;
+  };
+  const getTrk = () => { try { return normTrk(JSON.parse(localStorage.getItem(TRK_KEY) || 'null')) || { name: 'Tip', cats: ['tip'] }; } catch { return { name: 'Tip', cats: ['tip'] }; } };
+  const tipByMonth = (ms) => { const { cats } = getTrk(); return ms.map((m) => state.txs.filter((t) => t.type === 'income' && cats.includes(t.cat) && t.date.startsWith(m)).reduce((a, t) => a + t.amount, 0)); };
   const tipMonthName = (m) => `Tháng ${+m.slice(5)}${m.slice(0, 4) !== state.month.slice(0, 4) ? ' ' + m.slice(0, 4) : ''}`;
 
   // cột dạng ma trận chấm: mỗi tháng một cột 4 chấm ngang, cao tối đa 15 chấm, chấm to và đậm ở đáy, nhỏ và mờ dần lên đỉnh
@@ -535,7 +543,7 @@
       if (fill) g += `<text class="val mkt" x="${cx.toFixed(1)}" y="${Math.max(11, base - fill * cell - 6).toFixed(1)}" text-anchor="middle">${compact(vals[i])}</text>`;
       g += `<text x="${cx.toFixed(1)}" y="${H - 6}" text-anchor="middle"${sel ? ' style="fill:var(--orange)"' : ''}>T${+m.slice(5)}</text>`;
     });
-    return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Tip theo tháng">${g}</svg>`;
+    return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(getTrk().name)} theo tháng">${g}</svg>`;
   }
   // thanh xếp hạng dạng hàng chấm
   function dotBar(frac, d) {
@@ -546,13 +554,14 @@
   }
 
   function tipBody() {
+    const trk = getTrk(), lname = esc(trk.name.toLowerCase());
     const ms = monthsEnding(6), vals = tipByMonth(ms);
-    if (!Math.max(...vals)) return '<div class="empty-sm">Chưa có tip. Thêm khoản thu và chọn danh mục Tip</div>';
+    if (!Math.max(...vals)) return `<div class="empty-sm">Chưa có ${lname}. Thêm khoản thu và chọn danh mục ${esc(trk.cats.map((id) => CAT_MAP[id].name).join(', '))}</div>`;
     if (tipView() === 'chart') return tipDotChart(ms, vals);
     // xếp hạng: tháng nhiều tip nhất đứng đầu, thanh so với tháng đứng đầu
     const rows = ms.map((m, i) => ({ m, v: vals[i], i })).sort((a, b) => b.v - a.v || b.i - a.i);
     const max = rows[0].v, selRank = rows.findIndex((r) => r.m === state.month) + 1, selV = vals[ms.indexOf(state.month)];
-    const sum = selV ? `${tipMonthName(state.month)} đứng hạng ${selRank}/${rows.length}` : `${tipMonthName(state.month)} chưa có tip`;
+    const sum = selV ? `${tipMonthName(state.month)} đứng hạng ${selRank}/${rows.length}` : `${tipMonthName(state.month)} chưa có ${lname}`;
     return `<div class="rsum">${sum}</div>` + rows.map((r, k) => `
       <div class="rrow${r.m === state.month ? ' sel' : ''}${r.v ? '' : ' zero'}" style="--d:${k * 60}ms">
         <span class="rk num">${k + 1}</span><span class="rl">${tipMonthName(r.m)}</span>
@@ -562,8 +571,8 @@
   }
   function tipCard() {
     const v = tipView();
-    return `<section class="card glass" data-tipcard><h2><span>Tip</span>
-      <span class="tipseg"><button data-tipview="chart" class="${v === 'chart' ? 'on' : ''}">Biểu đồ</button><button data-tipview="compare" class="${v === 'compare' ? 'on' : ''}">So sánh</button></span></h2>
+    return `<section class="card glass" data-tipcard><h2><span class="trkname">${esc(getTrk().name)}</span>
+      <span class="trkr"><button class="icon-btn trkgear" data-act="trk-open" aria-label="Cấu hình nguồn thu"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5h0a1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button><span class="tipseg"><button data-tipview="chart" class="${v === 'chart' ? 'on' : ''}">Biểu đồ</button><button data-tipview="compare" class="${v === 'compare' ? 'on' : ''}">So sánh</button></span></span></h2>
       <div class="tipbody">${tipBody()}</div></section>`;
   }
 
@@ -933,6 +942,31 @@
     unlockIfNone();
   }
 
+  /* ---------- sheet cấu hình tracker ---------- */
+  const ksheet = { cats: [] };
+  function fillK() {
+    $('#k-cats').innerHTML = CATS.income.map((c) => `<button type="button" class="chip${ksheet.cats.includes(c.id) ? ' on' : ''}" data-kcat="${c.id}" aria-pressed="${ksheet.cats.includes(c.id)}">${esc(c.name)}</button>`).join('');
+  }
+  function openKSheet() {
+    const t = getTrk(); ksheet.cats = [...t.cats];
+    $('#k-name').value = t.name; fillK();
+    const el = $('#ksheet');
+    el.classList.add('open'); el.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('lock');
+  }
+  function closeKSheet() {
+    const el = $('#ksheet');
+    el.classList.remove('open'); el.setAttribute('aria-hidden', 'true');
+    unlockIfNone();
+  }
+  function saveK() {
+    const name = $('#k-name').value.trim();
+    if (!name) { toast('Nhập tên hiển thị'); return; }
+    if (!ksheet.cats.length) { toast('Chọn ít nhất 1 nguồn thu'); return; }
+    try { localStorage.setItem(TRK_KEY, JSON.stringify({ name: name.slice(0, 24), cats: ksheet.cats })); } catch { toast('Không lưu được'); return; }
+    closeKSheet(); render(); toast('Đã lưu');
+  }
+
   /* ---------- sheet nợ ---------- */
   const dsheet = { mode: 'pay', editing: null, debtId: null };
   const remainingOf = (id) => { const d = state.debts.find((x) => x.id === id); if (!d) return 0; return Math.max(0, d.total - livePays().filter((p) => p.debtId === id).reduce((a, p) => a + p.amount, 0)); };
@@ -1069,7 +1103,7 @@
     return true;
   }
   async function exportJSON() {
-    const data = { app: 'dong-tien', version: 2, exportedAt: new Date().toISOString(), transactions: state.txs, debts: state.debts, payments: state.pays };
+    const data = { app: 'dong-tien', version: 2, exportedAt: new Date().toISOString(), transactions: state.txs, debts: state.debts, payments: state.pays, tracker: getTrk() };
     if (await saveFile(`dong-tien-${todayStr()}.json`, 'application/json', JSON.stringify(data, null, 2))) {
       setLastBackup(); render(); toast('Đã xuất backup');
     }
@@ -1108,6 +1142,8 @@
       if (ok.length) await dbBulk(ok);
       if (dOk.length) await dbBulkS('debts', dOk);
       if (pOk.length) await dbBulkS('pays', pOk);
+      const trk = normTrk(data.tracker);
+      if (trk) { try { localStorage.setItem(TRK_KEY, JSON.stringify(trk)); } catch { /* ignore */ } }
       state.txs = await dbAll(); state.debts = await dbAllS('debts'); state.pays = await dbAllS('pays');
       render();
       toast(`Đã nhập ${ok.length} giao dịch${dOk.length ? `, ${dOk.length} khoản nợ, ${pOk.length} lần trả` : ''}`);
@@ -1116,6 +1152,7 @@
 
   /* ---------- events ---------- */
   const ACTIONS = {
+    'trk-open': openKSheet, kclose: closeKSheet, ksave: saveK,
     prev: () => { state.month = shiftMonth(state.month, -1); render(); },
     next: () => { state.month = shiftMonth(state.month, 1); render(); },
     add: () => (state.tab === 'debt' ? (state.debts.length ? openDSheet('pay') : openDSheet('debt')) : openSheet()),
@@ -1162,7 +1199,7 @@
   };
 
   document.addEventListener('click', (e) => {
-    const el = e.target.closest('[data-cumview],[data-tipview],[data-act],[data-tab],[data-id],[data-f],[data-type],[data-add],[data-mul],[data-cat],[data-dedit],[data-dpay],[data-pid],[data-dsel],[data-dadd],[data-dmul],[data-dq],[data-cday],[data-cnav],[data-ctoggle],[data-tile],[data-tg]');
+    const el = e.target.closest('[data-cumview],[data-tipview],[data-act],[data-tab],[data-id],[data-f],[data-type],[data-add],[data-mul],[data-cat],[data-dedit],[data-dpay],[data-pid],[data-dsel],[data-dadd],[data-dmul],[data-dq],[data-cday],[data-cnav],[data-ctoggle],[data-tile],[data-tg],[data-kcat]');
     if (!el) return;
     const d = el.dataset;
     if (d.act) return ACTIONS[d.act] && ACTIONS[d.act]();
@@ -1183,6 +1220,12 @@
         $$('.tipseg button', card).forEach((b) => b.classList.toggle('on', b.dataset.tipview === d.tipview));
         swapBody($('.tipbody', card), tipBody());
       }
+      return;
+    }
+    if (d.kcat) {
+      const i = ksheet.cats.indexOf(d.kcat);
+      if (i >= 0) ksheet.cats.splice(i, 1); else ksheet.cats.push(d.kcat);
+      const on = i < 0; el.classList.toggle('on', on); el.setAttribute('aria-pressed', on);
       return;
     }
     if (d.tile) { openTSheet(d.tile); return; }
@@ -1225,7 +1268,7 @@
       renderListBody();
     }
   });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSheet(); closeDSheet(); closeTSheet(); } });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSheet(); closeDSheet(); closeTSheet(); closeKSheet(); } });
 
   /* ---------- vuốt ngang: 2 trang dính nhau trượt cùng ngón tay (Tổng quan > Nợ > Giao dịch) ---------- */
   const TAB_ORDER = ['home', 'debt', 'list'];
